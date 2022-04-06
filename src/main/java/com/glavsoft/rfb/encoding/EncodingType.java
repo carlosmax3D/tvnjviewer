@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,10 +19,11 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.encoding;
+
+import com.glavsoft.rfb.encoding.decoder.*;
 
 import java.util.LinkedHashSet;
 
@@ -33,76 +34,79 @@ public enum EncodingType {
 	/**
 	 * Desktop data representes as raw bytes stream
 	 */
-	RAW_ENCODING(0, "Raw"),
+	RAW_ENCODING(0, "Raw", RawDecoder.class),
 	/**
 	 * Specfies encodings which allow to copy part of image in client's
 	 * framebuffer from one place to another.
 	 */
-	COPY_RECT(1, "CopyRect"),
-	RRE(2, "RRE"),
+	COPY_RECT(1, "CopyRect", CopyRectDecoder.class),
+	RRE(2, "RRE", RREDecoder.class),
 	/**
 	 *  Hextile encoding, uses palettes, filling and raw subencoding
 	 */
-    HEXTILE(5, "Hextile"),
+    HEXTILE(5, "Hextile", HextileDecoder.class),
     /**
      * This encoding is like raw but previously all data compressed with zlib.
      */
-    ZLIB(6, "ZLib"),
+    ZLIB(6, "ZLib", ZlibDecoder.class),
 	/**
 	 * Tight Encoding for slow connection. It is uses raw data, palettes, filling
 	 * and jpeg subencodings
 	 */
-	TIGHT(7, "Tight"),
+	TIGHT(7, "Tight", TightDecoder.class),
     //ZlibHex(8),
 	/**
 	 * ZRLE Encoding is like Hextile but previously all data compressed with zlib.
 	 */
-    ZRLE(16, "ZRLE"),
+    ZRLE(16, "ZRLE", ZRLEDecoder.class),
 
     /**
      * Rich Cursor pseudo encoding which allows to transfer cursor shape
      * with transparency
      */
-    RICH_CURSOR(0xFFFFFF11, "RichCursor"),
+    RICH_CURSOR(0xFFFFFF11, "RichCursor", RichCursorDecoder.class),
     /**
      * Desktop Size Pseudo encoding allows to notificate client about
      *  remote screen resolution changed.
      */
-    DESKTOP_SIZE(0xFFFFFF21, "DesctopSize"),
+    DESKTOP_SIZE(0xFFFFFF21, "DesctopSize", DesctopSizeDecoder.class),
     /**
      * Cusros position encoding allows to transfer remote cursor position to
      * client side.
      */
-	CURSOR_POS(0xFFFFFF18, "CursorPos"),
+	CURSOR_POS(0xFFFFFF18, "CursorPos", CursorPosDecoder.class),
 
-	COMPRESS_LEVEL_0(0xFFFFFF00 + 0, "CompressionLevel0"),
-	COMPRESS_LEVEL_1(0xFFFFFF00 + 1, "CompressionLevel1"),
-	COMPRESS_LEVEL_2(0xFFFFFF00 + 2, "CompressionLevel2"),
-	COMPRESS_LEVEL_3(0xFFFFFF00 + 3, "CompressionLevel3"),
-	COMPRESS_LEVEL_4(0xFFFFFF00 + 4, "CompressionLevel4"),
-	COMPRESS_LEVEL_5(0xFFFFFF00 + 5, "CompressionLevel5"),
-	COMPRESS_LEVEL_6(0xFFFFFF00 + 6, "CompressionLevel6"),
-	COMPRESS_LEVEL_7(0xFFFFFF00 + 7, "CompressionLevel7"),
-	COMPRESS_LEVEL_8(0xFFFFFF00 + 8, "CompressionLevel8"),
-	COMPRESS_LEVEL_9(0xFFFFFF00 + 9, "CompressionLevel9"),
+	COMPRESS_LEVEL_0(0xFFFFFF00 + 0, "CompressionLevel0", FakeDecoder.class),
+	COMPRESS_LEVEL_1(0xFFFFFF00 + 1, "CompressionLevel1", null),
+	COMPRESS_LEVEL_2(0xFFFFFF00 + 2, "CompressionLevel2", null),
+	COMPRESS_LEVEL_3(0xFFFFFF00 + 3, "CompressionLevel3", null),
+	COMPRESS_LEVEL_4(0xFFFFFF00 + 4, "CompressionLevel4", null),
+	COMPRESS_LEVEL_5(0xFFFFFF00 + 5, "CompressionLevel5", null),
+	COMPRESS_LEVEL_6(0xFFFFFF00 + 6, "CompressionLevel6", null),
+	COMPRESS_LEVEL_7(0xFFFFFF00 + 7, "CompressionLevel7", null),
+	COMPRESS_LEVEL_8(0xFFFFFF00 + 8, "CompressionLevel8", null),
+	COMPRESS_LEVEL_9(0xFFFFFF00 + 9, "CompressionLevel9", null),
 
-	JPEG_QUALITY_LEVEL_0(0xFFFFFFE0 + 0, "JpegQualityLevel0"),
-	JPEG_QUALITY_LEVEL_1(0xFFFFFFE0 + 1, "JpegQualityLevel1"),
-	JPEG_QUALITY_LEVEL_2(0xFFFFFFE0 + 2, "JpegQualityLevel2"),
-	JPEG_QUALITY_LEVEL_3(0xFFFFFFE0 + 3, "JpegQualityLevel3"),
-	JPEG_QUALITY_LEVEL_4(0xFFFFFFE0 + 4, "JpegQualityLevel4"),
-	JPEG_QUALITY_LEVEL_5(0xFFFFFFE0 + 5, "JpegQualityLevel5"),
-	JPEG_QUALITY_LEVEL_6(0xFFFFFFE0 + 6, "JpegQualityLevel6"),
-	JPEG_QUALITY_LEVEL_7(0xFFFFFFE0 + 7, "JpegQualityLevel7"),
-	JPEG_QUALITY_LEVEL_8(0xFFFFFFE0 + 8, "JpegQualityLevel8"),
-	JPEG_QUALITY_LEVEL_9(0xFFFFFFE0 + 9, "JpegQualityLevel9");
+	JPEG_QUALITY_LEVEL_0(0xFFFFFFE0 + 0, "JpegQualityLevel0", FakeDecoder.class),
+	JPEG_QUALITY_LEVEL_1(0xFFFFFFE0 + 1, "JpegQualityLevel1", null),
+	JPEG_QUALITY_LEVEL_2(0xFFFFFFE0 + 2, "JpegQualityLevel2", null),
+	JPEG_QUALITY_LEVEL_3(0xFFFFFFE0 + 3, "JpegQualityLevel3", null),
+	JPEG_QUALITY_LEVEL_4(0xFFFFFFE0 + 4, "JpegQualityLevel4", null),
+	JPEG_QUALITY_LEVEL_5(0xFFFFFFE0 + 5, "JpegQualityLevel5", null),
+	JPEG_QUALITY_LEVEL_6(0xFFFFFFE0 + 6, "JpegQualityLevel6", null),
+	JPEG_QUALITY_LEVEL_7(0xFFFFFFE0 + 7, "JpegQualityLevel7", null),
+	JPEG_QUALITY_LEVEL_8(0xFFFFFFE0 + 8, "JpegQualityLevel8", null),
+	JPEG_QUALITY_LEVEL_9(0xFFFFFFE0 + 9, "JpegQualityLevel9", null);
 
-	private int id;
+	private final int id;
 	private final String name;
-	private EncodingType(int id, String name) {
+    public final Class<? extends Decoder> klass;
+
+    private EncodingType(int id, String name, Class<? extends Decoder> klass) {
 		this.id = id;
 		this.name = name;
-	}
+        this.klass = klass;
+    }
 
 	public int getId() {
 		return id;
@@ -111,7 +115,7 @@ public enum EncodingType {
 		return name;
 	}
 
-	public static LinkedHashSet<EncodingType> ordinaryEncodings = new LinkedHashSet<EncodingType>();
+	public static final LinkedHashSet<EncodingType> ordinaryEncodings = new LinkedHashSet<EncodingType>();
 	static {
 		ordinaryEncodings.add(TIGHT);
 		ordinaryEncodings.add(HEXTILE);
@@ -122,17 +126,11 @@ public enum EncodingType {
 //		ordinaryEncodings.add(RAW_ENCODING);
 	}
 
-	public static LinkedHashSet<EncodingType> pseudoEncodings = new LinkedHashSet<EncodingType>();
+	public static final LinkedHashSet<EncodingType> pseudoEncodings = new LinkedHashSet<EncodingType>();
 	static {
 		pseudoEncodings.add(RICH_CURSOR);
 		pseudoEncodings.add(CURSOR_POS);
 		pseudoEncodings.add(DESKTOP_SIZE);
-	}
-
-	public static LinkedHashSet<EncodingType> compressionEncodings = new LinkedHashSet<EncodingType>();
-	static {
-		compressionEncodings.add(COMPRESS_LEVEL_0);
-		compressionEncodings.add(JPEG_QUALITY_LEVEL_0);
 	}
 
 	public static EncodingType byId(int id) {
@@ -141,7 +139,7 @@ public enum EncodingType {
 			if (type.getId() == id)
 				return type;
 		}
-		throw new IllegalArgumentException("Unsupported encoding id: " + id);
+		throw new IllegalArgumentException("Unsupported encoding code: " + id);
 	}
 
 }

@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,14 +19,13 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.encoding.decoder;
 
 import com.glavsoft.exceptions.TransportException;
 import com.glavsoft.rfb.encoding.EncodingType;
-import com.glavsoft.transport.Reader;
+import com.glavsoft.transport.Transport;
 
 /**
  * Header for framebuffer-update-rectangle header server message
@@ -53,12 +52,12 @@ public class FramebufferUpdateRectangle {
 		width = w; height = h;
 	}
 
-	public void fill(Reader reader) throws TransportException {
-    	x = reader.readUInt16();
-        y = reader.readUInt16();
-        width = reader.readUInt16();
-        height = reader.readUInt16();
-        int encoding = reader.readInt32();
+	public void fill(Transport transport) throws TransportException {
+    	x = transport.readUInt16();
+        y = transport.readUInt16();
+        width = transport.readUInt16();
+        height = transport.readUInt16();
+        int encoding = transport.readInt32();
 		encodingType = EncodingType.byId(encoding);
     }
 

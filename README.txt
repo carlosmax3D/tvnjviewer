@@ -1,6 +1,6 @@
 
-TightVNC Java Viewer version 2.7.2
-Copyright (C) 2011, 2012 GlavSoft LLC. All rights reserved.
+TightVNC Java Viewer version 2.8.3
+Copyright (C) 2010 - 2014 GlavSoft LLC. All rights reserved.
 ======================================================================
 
 This software is distributed under the GNU General Public Licence
@@ -12,7 +12,6 @@ proprietary programs. If you wish to do so, please order commercial
 source code license. See the details here:
 
   http://www.tightvnc.com/licensing/
-
 
 Using TightVNC Java Viewer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -43,6 +42,18 @@ For more command line params info run:
 
 Finally, if you would like to use the viewer as an applet, please see
 the example HTML page included (viewer-applet-example.html).
+
+Compiling from the sources
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To compile TightVNC Java Viewer from the source code, you need to have
+JDK (Java Development Kit) installed (http://java.oracle.com).
+The sources are compatible with Java 6.
+
+Just run "gradlew" command at the source root directory ("gradlew.bat"
+for MS Windows OS). This command will download Gradle build tool and
+generate tightvnc-jviewer.jar executable file. The file will be located
+at ./dist/tightvnc-jviewer-[version]/ directory.
 
 ======================================================================
 

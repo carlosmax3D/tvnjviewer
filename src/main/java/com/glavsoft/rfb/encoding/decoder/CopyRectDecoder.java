@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,22 +19,21 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.encoding.decoder;
 
 import com.glavsoft.drawing.Renderer;
 import com.glavsoft.exceptions.TransportException;
-import com.glavsoft.transport.Reader;
+import com.glavsoft.transport.Transport;
 
 public class CopyRectDecoder extends Decoder {
 
 	@Override
-	public void decode(Reader reader, Renderer renderer,
+	public void decode(Transport transport, Renderer renderer,
 			FramebufferUpdateRectangle rect) throws TransportException {
-		int srcX = reader.readUInt16();
-		int srcY = reader.readUInt16();
+		int srcX = transport.readUInt16();
+		int srcY = transport.readUInt16();
 		if (rect.width == 0  || rect.height == 0) return;
 		renderer.copyRect(srcX, srcY, rect);
 	}

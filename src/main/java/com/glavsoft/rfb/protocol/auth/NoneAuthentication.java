@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,25 +19,22 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.protocol.auth;
 
-import com.glavsoft.rfb.CapabilityContainer;
-import com.glavsoft.rfb.IPasswordRetriever;
-import com.glavsoft.transport.Reader;
-import com.glavsoft.transport.Writer;
+import com.glavsoft.exceptions.TransportException;
+import com.glavsoft.rfb.protocol.Protocol;
+import com.glavsoft.transport.Transport;
 
 public class NoneAuthentication extends AuthHandler {
 
 	@Override
-	public boolean authenticate(Reader reader, Writer writer,
-			CapabilityContainer authCaps, IPasswordRetriever passwordRetriever) {
-		return false;
+	public Transport authenticate(Transport transport, Protocol protocol) throws TransportException {
+		return transport;
 	}
 
-	@Override
+    @Override
 	public SecurityType getType() {
 		return SecurityType.NONE_AUTHENTICATION;
 	}

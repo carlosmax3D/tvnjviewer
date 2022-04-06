@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,14 +19,13 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.client;
 
 import com.glavsoft.exceptions.TransportException;
 import com.glavsoft.rfb.encoding.PixelFormat;
-import com.glavsoft.transport.Writer;
+import com.glavsoft.transport.Transport;
 
 public class SetPixelFormatMessage implements ClientToServerMessage {
 	private final PixelFormat pixelFormat;
@@ -36,12 +35,11 @@ public class SetPixelFormatMessage implements ClientToServerMessage {
 	}
 
 	@Override
-	public void send(Writer writer) throws TransportException {
-		writer.writeByte(SET_PIXEL_FORMAT);
-		writer.writeInt16(0);
-		writer.writeByte(0);
-		pixelFormat.send(writer);
-		writer.flush();
+	public void send(Transport transport) throws TransportException {
+		transport.writeByte(ClientMessageType.SET_PIXEL_FORMAT.id)
+                .zero(3);
+		pixelFormat.send(transport);
+		transport.flush();
 	}
 
 }

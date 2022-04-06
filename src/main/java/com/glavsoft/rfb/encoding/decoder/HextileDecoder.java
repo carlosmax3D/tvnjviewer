@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,14 +19,13 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.encoding.decoder;
 
 import com.glavsoft.drawing.Renderer;
 import com.glavsoft.exceptions.TransportException;
-import com.glavsoft.transport.Reader;
+import com.glavsoft.transport.Transport;
 
 
 public class HextileDecoder extends Decoder {
@@ -40,7 +39,7 @@ public class HextileDecoder extends Decoder {
 	private static final int BG_COLOR_INDEX = 1;
 
 	@Override
-	public void decode(Reader reader, Renderer renderer,
+	public void decode(Transport transport, Renderer renderer,
 			FramebufferUpdateRectangle rect) throws TransportException {
 		if (rect.width == 0  || rect.height == 0) return;
 		int[] colors = new int[] {-1, -1};
@@ -52,55 +51,49 @@ public class HextileDecoder extends Decoder {
 			for (int tileX = rect.x; tileX < maxX;
 			tileX += DEFAULT_TILE_SIZE) {
 				int tileWidth = Math.min(maxX - tileX, DEFAULT_TILE_SIZE);
-				decodeHextileSubrectangle(reader, renderer, colors, tileX,
+				decodeTile(transport, renderer, colors, tileX,
 						tileY, tileWidth, tileHeight);
 			}
 		}
 
 	}
 
-	private void decodeHextileSubrectangle(Reader reader,
-			Renderer renderer, int[] colors,
-			int tileX, int tileY, int tileWidth, int tileHeight)
+	private void decodeTile(Transport transport,
+                            Renderer renderer, int[] colors,
+                            int tileX, int tileY, int tileWidth, int tileHeight)
 			throws TransportException {
-
-		int subencoding = reader.readUInt8();
-
-		if ((subencoding & RAW_MASK) != 0) {
-			RawDecoder.getInstance().decode(reader, renderer,
+        int subencoding = transport.readUInt8();
+        if ((subencoding & RAW_MASK) != 0) {
+			RawDecoder.getInstance().decode(transport, renderer,
 					tileX, tileY, tileWidth, tileHeight);
 			return;
 		}
 
 		if ((subencoding & BACKGROUND_SPECIFIED_MASK) != 0) {
-			colors[BG_COLOR_INDEX] = renderer.readPixelColor(reader);
-		}
-		assert colors[BG_COLOR_INDEX] != -1;
+			colors[BG_COLOR_INDEX] = renderer.readPixelColor(transport);
+        }
 		renderer.fillRect(colors[BG_COLOR_INDEX],
 				tileX, tileY, tileWidth, tileHeight);
 
 		if ((subencoding & FOREGROUND_SPECIFIED_MASK) != 0) {
-			colors[FG_COLOR_INDEX] = renderer.readPixelColor(reader);
+			colors[FG_COLOR_INDEX] = renderer.readPixelColor(transport);
 		}
 
 		if ((subencoding & ANY_SUBRECTS_MASK) == 0)
 			return;
 
-		int numberOfSubrectangles = reader.readUInt8();
-		boolean colorSpecified =
-			(subencoding & SUBRECTS_COLOURED_MASK) != 0;
+		int numberOfSubrectangles = transport.readUInt8();
+        boolean colorSpecified = (subencoding & SUBRECTS_COLOURED_MASK) != 0;
 		for (int i = 0; i < numberOfSubrectangles; ++i) {
-			if (colorSpecified) {
-				colors[FG_COLOR_INDEX] = renderer.readPixelColor(reader);
-			}
-			byte dimensions = reader.readByte(); // bits 7-4 for x, bits 3-0 for y
-			int subtileX = dimensions >> 4 & 0x0f;
+            int color = colorSpecified ? renderer.readPixelColor(transport) : colors[FG_COLOR_INDEX];
+            colors[FG_COLOR_INDEX] = color;
+            byte dimensions = transport.readByte(); // bits 7-4 for x, bits 3-0 for y
+            int subtileX = dimensions >> 4 & 0x0f;
 			int subtileY = dimensions & 0x0f;
-			dimensions = reader.readByte(); // bits 7-4 for w, bits 3-0 for h
-			int subtileWidth = 1 + (dimensions >> 4 & 0x0f);
+			dimensions = transport.readByte(); // bits 7-4 for w, bits 3-0 for h
+            int subtileWidth = 1 + (dimensions >> 4 & 0x0f);
 			int subtileHeight = 1 + (dimensions & 0x0f);
-			assert colors[FG_COLOR_INDEX] != -1;
-			renderer.fillRect(colors[FG_COLOR_INDEX],
+            renderer.fillRect(color,
 					tileX + subtileX, tileY + subtileY,
 					subtileWidth, subtileHeight);
 		}

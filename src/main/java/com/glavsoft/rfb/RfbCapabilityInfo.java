@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,13 +19,12 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb;
 
 import com.glavsoft.exceptions.TransportException;
-import com.glavsoft.transport.Reader;
+import com.glavsoft.transport.Transport;
 
 /**
  * Structure used to describe protocol options such as tunneling methods,
@@ -47,7 +46,7 @@ public class RfbCapabilityInfo {
 	public static final String VENDOR_TRIADA = "TRDV";
 	public static final String VENDOR_TIGHT = "TGHT";
 
-	public static final String TUNNELING_NO_TUNNELING = "NOTUNNEL";
+	public static final String TUNNELING_NO_TUNNEL = "NOTUNNEL";
 
 	public static final String AUTHENTICATION_NO_AUTH = "NOAUTH__";
 	public static final String AUTHENTICATION_VNC_AUTH ="VNCAUTH_";
@@ -68,31 +67,44 @@ public class RfbCapabilityInfo {
 	private String nameSignature;
 	private boolean enable;
 
-	public RfbCapabilityInfo(int code, String vendorSignature, String nameSignature) {
+    public RfbCapabilityInfo(int code, String vendorSignature, String nameSignature) {
 		this.code = code;
 		this.vendorSignature = vendorSignature;
 		this.nameSignature = nameSignature;
 		enable = true;
 	}
 
-	public RfbCapabilityInfo(Reader reader) throws TransportException {
-		code = reader.readInt32();
-		vendorSignature = reader.readString(4);
-		nameSignature = reader.readString(8);
-	}
+    public RfbCapabilityInfo() {
+        this(0, "", "");
+    }
 
-	@Override
-	public boolean equals(Object otherObj) {
-		if (this == otherObj) { return true; }
-		if (null == otherObj) { return false; }
-		if (getClass() != otherObj.getClass()) { return false; }
-		RfbCapabilityInfo other = (RfbCapabilityInfo) otherObj;
-		return code == other.code &&
-			vendorSignature.equals(other.vendorSignature) &&
-			nameSignature.equals(other.nameSignature);
-	}
+    public RfbCapabilityInfo readFrom(Transport transport) throws TransportException {
+        code = transport.readInt32();
+        vendorSignature = transport.readString(4);
+        nameSignature = transport.readString(8);
+        enable = true;
+        return this;
+    }
 
-	public void setEnable(boolean enable) {
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        RfbCapabilityInfo that = (RfbCapabilityInfo) o;
+        return code == that.code &&
+                nameSignature.equals(that.nameSignature) &&
+                vendorSignature.equals(that.vendorSignature);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = code;
+        result = 31 * result + vendorSignature.hashCode();
+        result = 31 * result + nameSignature.hashCode();
+        return result;
+    }
+
+    public void setEnable(boolean enable) {
 		this.enable = enable;
 	}
 
@@ -112,11 +124,12 @@ public class RfbCapabilityInfo {
 		return enable;
 	}
 
-	@Override
-	public String toString() {
-		return "RfbCapabilityInfo: [code: " + code +
-		", vendor: " + vendorSignature +
-		", name: " + nameSignature +
-		"]";
-	}
+    @Override
+    public String toString() {
+        return "RfbCapabilityInfo{" +
+                "code=" + code +
+                ", vendorSignature='" + vendorSignature + '\'' +
+                ", nameSignature='" + nameSignature + '\'' +
+                '}';
+    }
 }

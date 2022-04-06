@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,15 +19,9 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.protocol.auth;
-
-import java.util.LinkedHashMap;
-import java.util.Map;
-
-import com.glavsoft.exceptions.UnsupportedSecurityTypeException;
 
 /**
  * Security types that implemented
@@ -37,7 +31,8 @@ public enum SecurityType {
 	VNC_AUTHENTICATION(2),
 //	int RA2_AUTHENTICATION = 5;
 //	int RA2NE_AUTHENTICATION = 6;
-	TIGHT_AUTHENTICATION(16);
+	TIGHT_AUTHENTICATION(16),
+    TIGHT2_AUTHENTICATION(116);
 //	int ULTRA_AUTHENTICATION = 17;
 //	int TLS_AUTHENTICATION = 18;
 //	int VENCRYPT_AUTHENTICATION = 19;
@@ -49,24 +44,6 @@ public enum SecurityType {
 
 	public int getId() {
 		return id;
-	}
-
-	@SuppressWarnings("serial")
-	public
-	static Map<Integer, AuthHandler> implementedSecurityTypes =
-		new LinkedHashMap<Integer, AuthHandler>() {{
-			put(TIGHT_AUTHENTICATION.getId(), new TightAuthentication());
-			put(VNC_AUTHENTICATION.getId(), new VncAuthentication());
-			put(NONE_AUTHENTICATION.getId(), new NoneAuthentication());
-	}};
-
-	public static AuthHandler getAuthHandlerById(int id) throws UnsupportedSecurityTypeException {
-		AuthHandler typeSelected = null;
-		typeSelected = implementedSecurityTypes.get(id);
-		if (null == typeSelected) {
-			throw new UnsupportedSecurityTypeException("Not supported: " + id);
-		}
-		return typeSelected;
 	}
 
 }

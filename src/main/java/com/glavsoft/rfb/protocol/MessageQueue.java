@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,9 +19,8 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.protocol;
 
 import com.glavsoft.rfb.client.ClientToServerMessage;
@@ -29,6 +28,7 @@ import com.glavsoft.rfb.client.ClientToServerMessage;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
 /**
  * @author dime at tightvnc.com
@@ -41,7 +41,9 @@ public class MessageQueue {
 	}
 
 	public void put(ClientToServerMessage message) {
-		queue.offer(message);
+		if ( ! queue.offer(message)) {
+            Logger.getLogger(getClass().getName()).severe("Cannot put message into message queue. Skip: " + message);
+        }
 	}
 
     /**

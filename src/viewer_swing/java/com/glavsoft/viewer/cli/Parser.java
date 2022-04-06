@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,9 +19,8 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.viewer.cli;
 
 import com.glavsoft.utils.Strings;
@@ -89,12 +88,13 @@ public class Parser {
 	 * Command line interface option
 	 */
 	private static class Option {
-		protected String opName, defaultValue, desc, value;
-		protected boolean isSet = false;
-		public Option(String opName, String defaultValue, String desc) {
+		String opName;
+        String desc;
+        String value;
+		boolean isSet = false;
+		Option(String opName, String defaultValue, String desc) {
 			this.opName = opName;
-			this.defaultValue = defaultValue;
-			this.desc = desc;
+            this.desc = desc;
 			this.value = defaultValue;
 		}
 	}
@@ -103,9 +103,11 @@ public class Parser {
 		StringBuilder sb = new StringBuilder();
 		int maxNameLength = 0;
 		for (Option op : options.values()) {
+			if (op.desc.isEmpty()) continue;
 			maxNameLength = Math.max(maxNameLength, op.opName.length());
 		}
 		for (Option op : options.values()) {
+			if (op.desc.isEmpty()) continue;
 			sb.append(" -").append(op.opName);
 			for (int i=0; i<maxNameLength - op.opName.length(); ++i) {
 				sb.append(' ');

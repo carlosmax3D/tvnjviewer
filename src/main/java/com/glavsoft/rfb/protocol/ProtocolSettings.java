@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,23 +19,18 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.protocol;
 
 import com.glavsoft.core.SettingsChangedEvent;
-import com.glavsoft.rfb.CapabilityContainer;
 import com.glavsoft.rfb.IChangeSettingsListener;
-import com.glavsoft.rfb.RfbCapabilityInfo;
 import com.glavsoft.rfb.encoding.EncodingType;
-import com.glavsoft.rfb.protocol.auth.SecurityType;
+import com.glavsoft.rfb.protocol.tunnel.TunnelType;
 
 import java.io.Serializable;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Protocol Settings class
@@ -71,7 +66,12 @@ public class ProtocolSettings implements Serializable {
 	public static final int CHANGED_COLOR_DEPTH = 1 << 9;
     public static final int CHANGED_SHARED                      = 1 << 10;
 
-	private transient int changedSettingsMask;
+    private static final int MIN_COMPRESSION_LEVEL = 1;
+    private static final int MAX_COMPRESSION_LEVEL = 9;
+    private static final int MIN_JPEG_QUALITY = 1;
+    private static final int MAX_JPEG_QUALITY = 9;
+
+    private transient int changedSettingsMask;
 
     private boolean sharedFlag;
     private boolean viewOnly;
@@ -85,25 +85,15 @@ public class ProtocolSettings implements Serializable {
 	private boolean convertToAscii;
 	private int colorDepth;
 
-	public transient LinkedHashSet<EncodingType> encodings;
 	private transient final List<IChangeSettingsListener> listeners;
-
-    public transient CapabilityContainer
-		tunnelingCapabilities,
-		authCapabilities,
-		serverMessagesCapabilities,
-		clientMessagesCapabilities,
-		encodingTypesCapabilities;
 	private transient String remoteCharsetName;
+    private TunnelType tunnelType;
 
-	public static ProtocolSettings getDefaultSettings() {
-    	ProtocolSettings settings = new ProtocolSettings();
-	    settings.initKnownAuthCapabilities(settings.authCapabilities);
-	    settings.initKnownEncodingTypesCapabilities(settings.encodingTypesCapabilities);
-        return settings;
+    public static ProtocolSettings getDefaultSettings() {
+        return new ProtocolSettings();
     }
 
-	private ProtocolSettings() {
+    private ProtocolSettings() {
         sharedFlag = true;
         viewOnly = false;
         showRemoteCursor = true;
@@ -115,14 +105,8 @@ public class ProtocolSettings implements Serializable {
         convertToAscii = false;
         allowClipboardTransfer = true;
         colorDepth = COLOR_DEPTH_SERVER_SETTINGS;
-        refine();
 
-        listeners = new LinkedList<IChangeSettingsListener>();
-		tunnelingCapabilities = new CapabilityContainer();
-		authCapabilities = new CapabilityContainer();
-		serverMessagesCapabilities = new CapabilityContainer();
-		clientMessagesCapabilities = new CapabilityContainer();
-		encodingTypesCapabilities = new CapabilityContainer();
+        listeners = new CopyOnWriteArrayList<IChangeSettingsListener>();
 		changedSettingsMask = 0;
    	}
 
@@ -130,7 +114,6 @@ public class ProtocolSettings implements Serializable {
 		this();
         copyDataFrom(s);
         changedSettingsMask = s.changedSettingsMask;
-        encodings = s.encodings;
     }
 
     public void copyDataFrom(ProtocolSettings s) {
@@ -152,39 +135,6 @@ public class ProtocolSettings implements Serializable {
         if ((mask & CHANGED_COLOR_DEPTH) == 0) setColorDepth(s.colorDepth);
         if ((mask & CHANGED_ENCODINGS) == 0) setPreferredEncoding(s.preferredEncoding);
     }
-
-    private void initKnownAuthCapabilities(CapabilityContainer cc) {
-		cc.addEnabled(SecurityType.NONE_AUTHENTICATION.getId(),
-				RfbCapabilityInfo.VENDOR_STANDARD, RfbCapabilityInfo.AUTHENTICATION_NO_AUTH);
-		cc.addEnabled(SecurityType.VNC_AUTHENTICATION.getId(),
-				RfbCapabilityInfo.VENDOR_STANDARD, RfbCapabilityInfo.AUTHENTICATION_VNC_AUTH);
-	    //cc.addEnabled( 19, "VENC", "VENCRYPT");
-	    //cc.addEnabled( 20, "GTKV", "SASL____");
-	    //cc.addEnabled(129, RfbCapabilityInfo.TIGHT_VNC_VENDOR, "ULGNAUTH");
-	    //cc.addEnabled(130, RfbCapabilityInfo.TIGHT_VNC_VENDOR, "XTRNAUTH");
-	}
-
-	private void initKnownEncodingTypesCapabilities(CapabilityContainer cc) {
-		cc.add(EncodingType.COPY_RECT.getId(),
-				RfbCapabilityInfo.VENDOR_STANDARD, RfbCapabilityInfo.ENCODING_COPYRECT);
-		cc.add(EncodingType.HEXTILE.getId(),
-				RfbCapabilityInfo.VENDOR_STANDARD, RfbCapabilityInfo.ENCODING_HEXTILE);
-		cc.add(EncodingType.ZLIB.getId(),
-				RfbCapabilityInfo.VENDOR_TRIADA, RfbCapabilityInfo.ENCODING_ZLIB);
-		cc.add(EncodingType.ZRLE.getId(),
-				RfbCapabilityInfo.VENDOR_TRIADA, RfbCapabilityInfo.ENCODING_ZRLE);
-		cc.add(EncodingType.RRE.getId(),
-				RfbCapabilityInfo.VENDOR_STANDARD, RfbCapabilityInfo.ENCODING_RRE);
-		cc.add(EncodingType.TIGHT.getId(),
-				RfbCapabilityInfo.VENDOR_TIGHT, RfbCapabilityInfo.ENCODING_TIGHT);
-
-		cc.add(EncodingType.RICH_CURSOR.getId(),
-				RfbCapabilityInfo.VENDOR_TIGHT, RfbCapabilityInfo.ENCODING_RICH_CURSOR);
-		cc.add(EncodingType.CURSOR_POS.getId(),
-				RfbCapabilityInfo.VENDOR_TIGHT, RfbCapabilityInfo.ENCODING_CURSOR_POS);
-		cc.add(EncodingType.DESKTOP_SIZE.getId(),
-				RfbCapabilityInfo.VENDOR_TIGHT, RfbCapabilityInfo.ENCODING_DESKTOP_SIZE);
-	}
 
 	public void addListener(IChangeSettingsListener listener) {
 		listeners.add(listener);
@@ -216,11 +166,6 @@ public class ProtocolSettings implements Serializable {
 		}
 	}
 
-	public void enableAllEncodingCaps() {
-		encodingTypesCapabilities.setAllEnable(true);
-
-	}
-
 	public int getColorDepth() {
 		return colorDepth;
 	}
@@ -230,7 +175,7 @@ public class ProtocolSettings implements Serializable {
 	 */
 	public void setColorDepth(int depth) {
 		if (colorDepth != depth) {
-			changedSettingsMask |= CHANGED_COLOR_DEPTH;
+			changedSettingsMask |= CHANGED_COLOR_DEPTH | CHANGED_ENCODINGS;
 			switch (depth) {
             case COLOR_DEPTH_32:
                 colorDepth = COLOR_DEPTH_24;
@@ -246,62 +191,7 @@ public class ProtocolSettings implements Serializable {
 			default:
 				colorDepth = DEFAULT_COLOR_DEPTH;
 			}
-			refine();
 		}
-	}
-
-	public void refine() {
-		LinkedHashSet<EncodingType> encodings = new LinkedHashSet<EncodingType>();
-		if (EncodingType.RAW_ENCODING == preferredEncoding) {
-			// when RAW selected send no ordinary encodings so only default RAW encoding will be enabled
-		} else {
-			encodings.add(preferredEncoding); // preferred first
-			encodings.addAll(EncodingType.ordinaryEncodings);
-			if (compressionLevel > 0 && compressionLevel < 10) {
-				encodings.add(EncodingType.byId(
-						EncodingType.COMPRESS_LEVEL_0.getId() + compressionLevel));
-			}
-			if (jpegQuality > 0 && jpegQuality < 10 &&
-					(colorDepth == COLOR_DEPTH_24 || colorDepth == COLOR_DEPTH_SERVER_SETTINGS)) {
-				encodings.add(EncodingType.byId(
-						EncodingType.JPEG_QUALITY_LEVEL_0.getId() + jpegQuality));
-			}
-			if (allowCopyRect) {
-				encodings.add(EncodingType.COPY_RECT);
-			}
-		}
-		switch(mouseCursorTrack) {
-		case OFF:
-			setShowRemoteCursor(false);
-			break;
-		case HIDE:
-			setShowRemoteCursor(false);
-			encodings.add(EncodingType.RICH_CURSOR);
-			encodings.add(EncodingType.CURSOR_POS);
-			break;
-		case ON:
-		default:
-			setShowRemoteCursor(true);
-			encodings.add(EncodingType.RICH_CURSOR);
-			encodings.add(EncodingType.CURSOR_POS);
-		}
-		encodings.add(EncodingType.DESKTOP_SIZE);
-		if ( isEncodingsChanged(this.encodings, encodings) || isChangedEncodings()) {
-			this.encodings = encodings;
-			changedSettingsMask |= CHANGED_ENCODINGS;
-		}
-	}
-
-	private boolean isEncodingsChanged(LinkedHashSet<EncodingType> encodings1, LinkedHashSet<EncodingType> encodings2) {
-		if (null == encodings1 || encodings1.size() != encodings2.size()) return true;
-		Iterator<EncodingType> it1 = encodings1.iterator();
-		Iterator<EncodingType> it2 = encodings2.iterator();
-		while (it1.hasNext()) {
-			EncodingType v1 = it1.next();
-			EncodingType v2 = it2.next();
-			if (v1 != v2) return true;
-		}
-		return false;
 	}
 
 	public void fireListeners() {
@@ -321,7 +211,6 @@ public class ProtocolSettings implements Serializable {
 		if (this.preferredEncoding != preferredEncoding) {
 			this.preferredEncoding = preferredEncoding;
 			changedSettingsMask |= CHANGED_ENCODINGS;
-			refine();
 		}
 	}
 
@@ -332,8 +221,7 @@ public class ProtocolSettings implements Serializable {
 	public void setAllowCopyRect(boolean allowCopyRect) {
 		if (this.allowCopyRect != allowCopyRect) {
 			this.allowCopyRect = allowCopyRect;
-			changedSettingsMask |= CHANGED_ALLOW_COPY_RECT;
-			refine();
+			changedSettingsMask |= CHANGED_ALLOW_COPY_RECT | CHANGED_ENCODINGS;
 		}
 	}
 
@@ -344,7 +232,7 @@ public class ProtocolSettings implements Serializable {
 	private void setShowRemoteCursor(boolean showRemoteCursor) {
 		if (this.showRemoteCursor != showRemoteCursor) {
 			this.showRemoteCursor = showRemoteCursor;
-			changedSettingsMask |= CHANGED_SHOW_REMOTE_CURSOR;
+			changedSettingsMask |= CHANGED_SHOW_REMOTE_CURSOR | CHANGED_ENCODINGS;
 		}
 	}
 
@@ -355,8 +243,8 @@ public class ProtocolSettings implements Serializable {
 	public void setMouseCursorTrack(LocalPointer mouseCursorTrack) {
 		if (this.mouseCursorTrack != mouseCursorTrack) {
 			this.mouseCursorTrack = mouseCursorTrack;
-			changedSettingsMask |= CHANGED_MOUSE_CURSOR_TRACK;
-			refine();
+			changedSettingsMask |= CHANGED_MOUSE_CURSOR_TRACK | CHANGED_ENCODINGS;
+            setShowRemoteCursor(LocalPointer.ON == mouseCursorTrack);
 		}
 	}
 
@@ -364,25 +252,27 @@ public class ProtocolSettings implements Serializable {
 		return mouseCursorTrack;
 	}
 
-	public void setCompressionLevel(int compressionLevel) {
-		if (this.compressionLevel != compressionLevel) {
-			this.compressionLevel = compressionLevel;
-			changedSettingsMask |= CHANGED_COMPRESSION_LEVEL;
-			refine();
-		}
-	}
+    public int setCompressionLevel(int compressionLevel) {
+        if (compressionLevel >= MIN_COMPRESSION_LEVEL && compressionLevel <= MAX_COMPRESSION_LEVEL &&
+                this.compressionLevel != compressionLevel) {
+            this.compressionLevel = compressionLevel;
+            changedSettingsMask |= CHANGED_COMPRESSION_LEVEL | CHANGED_ENCODINGS;
+        }
+        return this.compressionLevel;
+    }
 
 	public int getCompressionLevel() {
 		return compressionLevel;
 	}
 
-	public void setJpegQuality(int jpegQuality) {
-		if (this.jpegQuality != jpegQuality) {
-			this.jpegQuality = jpegQuality;
-			changedSettingsMask |= CHANGED_JPEG_QUALITY;
-			refine();
+    public int setJpegQuality(int jpegQuality) {
+        if (jpegQuality >= MIN_JPEG_QUALITY && jpegQuality <= MAX_JPEG_QUALITY &&
+                this.jpegQuality != jpegQuality) {
+            this.jpegQuality = jpegQuality;
+			changedSettingsMask |= CHANGED_JPEG_QUALITY | CHANGED_ENCODINGS;
 		}
-	}
+        return this.jpegQuality;
+    }
 
 	public int getJpegQuality() {
 		return jpegQuality;
@@ -441,5 +331,13 @@ public class ProtocolSettings implements Serializable {
                 ", convertToAscii=" + convertToAscii +
                 ", colorDepth=" + colorDepth +
                 '}';
+    }
+
+    public TunnelType getTunnelType() {
+        return tunnelType;
+    }
+
+    public void setTunnelType(TunnelType tunnelType) {
+        this.tunnelType = tunnelType;
     }
 }

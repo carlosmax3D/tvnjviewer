@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,14 +19,12 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.encoding;
 
 import com.glavsoft.exceptions.TransportException;
-import com.glavsoft.transport.Reader;
-import com.glavsoft.transport.Writer;
+import com.glavsoft.transport.Transport;
 
 /**
  * Pixel Format:
@@ -54,33 +52,33 @@ public class PixelFormat {
 	public byte greenShift;
 	public byte blueShift;
 
-	public void fill(Reader reader) throws TransportException {
-		bitsPerPixel = reader.readByte();
-		depth = reader.readByte();
-	    bigEndianFlag = reader.readByte();
-	    trueColourFlag = reader.readByte();
-	    redMax = reader.readInt16();
-	    greenMax = reader.readInt16();
-	    blueMax = reader.readInt16();
-	    redShift = reader.readByte();
-	    greenShift = reader.readByte();
-	    blueShift = reader.readByte();
-	    reader.readBytes(3); // skip padding bytes
+	public void fill(Transport transport) throws TransportException {
+		bitsPerPixel = transport.readByte();
+		depth = transport.readByte();
+	    bigEndianFlag = transport.readByte();
+	    trueColourFlag = transport.readByte();
+	    redMax = transport.readInt16();
+	    greenMax = transport.readInt16();
+	    blueMax = transport.readInt16();
+	    redShift = transport.readByte();
+	    greenShift = transport.readByte();
+	    blueShift = transport.readByte();
+	    transport.readBytes(3); // skip padding bytes
 	}
 
-    public void send(Writer writer) throws TransportException {
-    	writer.write(bitsPerPixel);
-    	writer.write(depth);
-    	writer.write(bigEndianFlag);
-    	writer.write(trueColourFlag);
-    	writer.write(redMax);
-    	writer.write(greenMax);
-    	writer.write(blueMax);
-    	writer.write(redShift);
-    	writer.write(greenShift);
-    	writer.write(blueShift);
-    	writer.writeInt16(0); // padding bytes
-    	writer.writeByte(0); // padding bytes
+    public void send(Transport transport) throws TransportException {
+    	transport.write(bitsPerPixel)
+                .write(depth)
+                .write(bigEndianFlag)
+                .write(trueColourFlag)
+                .write(redMax)
+                .write(greenMax)
+                .write(blueMax)
+                .write(redShift)
+                .write(greenShift)
+                .write(blueShift)
+                .writeInt16(0) // padding bytes
+    	        .writeByte(0); // padding bytes
     }
 
     public static PixelFormat create24bitColorDepthPixelFormat(int bigEndianFlag) {
@@ -117,7 +115,7 @@ public class PixelFormat {
     }
 
     /**
-     * specifies 256 colors, 2bit per Blue, 3bit per Green & Red
+     * specifies 256 colors, 2bit per Blue, 3bit per Green &amp; Red
      */
     public static PixelFormat create8bitColorDepthBGRPixelFormat(int bigEndianFlag) {
     	final PixelFormat pixelFormat = new PixelFormat();
@@ -135,7 +133,7 @@ public class PixelFormat {
     }
 
     /**
-     * specifies 64 colors, 2bit per Red, Green & Blue
+     * specifies 64 colors, 2bit per Red, Green &amp; Blue
      */
     public static PixelFormat create6bitColorDepthPixelFormat(int bigEndianFlag) {
     	final PixelFormat pixelFormat = new PixelFormat();
@@ -153,9 +151,9 @@ public class PixelFormat {
     }
 
     /**
-     * specifies 8 colors, 1bit per Red, Green & Blue
+     * specifies 8 colors, 1bit per Red, Green &amp; Blue
      */
-    public static PixelFormat create3bppPixelFormat(int bigEndianFlag) {
+    public static PixelFormat create3bitColorDepthPixelFormat(int bigEndianFlag) {
     	final PixelFormat pixelFormat = new PixelFormat();
     	pixelFormat.bigEndianFlag = (byte) bigEndianFlag;
 		pixelFormat.bitsPerPixel = 8;

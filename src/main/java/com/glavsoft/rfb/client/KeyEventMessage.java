@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,26 +19,24 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.client;
 
 import com.glavsoft.exceptions.TransportException;
-import com.glavsoft.transport.Writer;
+import com.glavsoft.transport.Transport;
 
 /**
- * A key press or release. Down-ﬂag is non-zero (true) if the key is now pressed, zero
- * (false) if it is now released. The key itself is speciﬁed using the “keysym” values
- * deﬁned by the X Window System.
+ * A key press or release. Down-flag is non-zero (true) if the key is now pressed, zero
+ * (false) if it is now released. The key itself is specified using the "keysym" values
+ * defined by the X Window System.
  * 1 - U8  - message-type
- * 1 - U8  - down-ﬂag
+ * 1 - U8  - down-flag
  * 2 - -   - padding
  * 4 - U32 - key
- * For most ordinary keys, the “keysym” is the same as the corresponding ASCII value.
- * For full details, see The Xlib Reference Manual, published by O’Reilly & Associates,
- * or see the header ﬁle <X11/keysymdef.h> from any X Window System installa-
- * tion.
+ * For most ordinary keys, the "keysym" is the same as the corresponding ASCII value.
+ * For full details, see The Xlib Reference Manual, published by O'Reilly &amp; Associates,
+ * or see the header file &lt;X11/keysymdef.h&gt; from any X Window System installation.
  */
 public class KeyEventMessage implements ClientToServerMessage {
 
@@ -51,12 +49,12 @@ public class KeyEventMessage implements ClientToServerMessage {
 	}
 
 	@Override
-	public void send(Writer writer) throws TransportException {
-		writer.writeByte(KEY_EVENT);
-		writer.writeByte(downFlag ? 1 : 0);
-		writer.writeInt16(0); // padding
-		writer.write(key);
-		writer.flush();
+	public void send(Transport transport) throws TransportException {
+		transport.writeByte(ClientMessageType.KEY_EVENT.id)
+                .writeByte(downFlag ? 1 : 0)
+                .zero(2) // padding
+		        .write(key)
+                .flush();
 	}
 
 	@Override

@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,13 +19,12 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.client;
 
 import com.glavsoft.exceptions.TransportException;
-import com.glavsoft.transport.Writer;
+import com.glavsoft.transport.Transport;
 
 
 public class FramebufferUpdateRequestMessage implements ClientToServerMessage {
@@ -45,14 +44,14 @@ public class FramebufferUpdateRequestMessage implements ClientToServerMessage {
 	}
 
 	@Override
-	public void send(Writer writer) throws TransportException {
-		writer.writeByte(FRAMEBUFFER_UPDATE_REQUEST);
-		writer.writeByte(incremental ? 1 : 0);
-		writer.writeInt16(x);
-		writer.writeInt16(y);
-		writer.writeInt16(width);
-		writer.writeInt16(height);
-		writer.flush();
+	public void send(Transport transport) throws TransportException {
+		transport.writeByte(ClientMessageType.FRAMEBUFFER_UPDATE_REQUEST.id)
+                .writeByte(incremental ? 1 : 0)
+                .writeInt16(x)
+                .writeInt16(y)
+                .writeInt16(width)
+                .writeInt16(height)
+                .flush();
 	}
 
 	@Override

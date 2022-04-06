@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,29 +19,28 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.encoding.decoder;
 
 import com.glavsoft.drawing.Renderer;
 import com.glavsoft.exceptions.TransportException;
-import com.glavsoft.transport.Reader;
+import com.glavsoft.transport.Transport;
 
 public class RREDecoder extends Decoder {
 
 	@Override
-	public void decode(Reader reader, Renderer renderer,
+	public void decode(Transport transport, Renderer renderer,
 			FramebufferUpdateRectangle rect) throws TransportException {
-		int numOfSubrectangles = reader.readInt32();
-		int color = renderer.readPixelColor(reader);
+		int numOfSubrectangles = transport.readInt32();
+		int color = renderer.readPixelColor(transport);
 		renderer.fillRect(color, rect);
 		for (int i = 0; i < numOfSubrectangles; ++i) {
-			color = renderer.readPixelColor(reader);
-			int x = reader.readUInt16();
-			int y = reader.readUInt16();
-			int width = reader.readUInt16();
-			int height = reader.readUInt16();
+			color = renderer.readPixelColor(transport);
+			int x = transport.readUInt16();
+			int y = transport.readUInt16();
+			int width = transport.readUInt16();
+			int height = transport.readUInt16();
 			renderer.fillRect(color, rect.x + x, rect.y + y, width, height);
 		}
 

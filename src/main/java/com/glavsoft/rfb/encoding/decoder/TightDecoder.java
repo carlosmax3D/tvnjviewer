@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,15 +19,14 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.encoding.decoder;
 
 import com.glavsoft.drawing.ColorDecoder;
 import com.glavsoft.drawing.Renderer;
 import com.glavsoft.exceptions.TransportException;
-import com.glavsoft.transport.Reader;
+import com.glavsoft.transport.Transport;
 
 import java.util.logging.Logger;
 import java.util.zip.DataFormatException;
@@ -61,7 +60,7 @@ public class TightDecoder extends Decoder {
 	}
 
 	@Override
-	public void decode(Reader reader, Renderer renderer,
+	public void decode(Transport transport, Renderer renderer,
 			FramebufferUpdateRectangle rect) throws TransportException {
 		int bytesPerPixel = renderer.getBytesPerPixelTight();
 
@@ -77,48 +76,48 @@ public class TightDecoder extends Decoder {
 		 * 1 - reset decoder #1
 		 * 0 - reset decoder #0
 		 */
-		int compControl = reader.readUInt8();
+		int compControl = transport.readUInt8();
 		resetDecoders(compControl);
 
 		int compType = compControl >> 4 & 0x0F;
 		switch (compType) {
 		case FILL_TYPE:
-			int color = renderer.readTightPixelColor(reader);
+			int color = renderer.readTightPixelColor(transport);
 			renderer.fillRect(color, rect);
 			break;
 		case JPEG_TYPE:
             assert 3 == bytesPerPixel : "Tight doesn't support JPEG subencoding while depth not equal to 24bpp is used";
-			processJpegType(reader, renderer, rect);
+			processJpegType(transport, renderer, rect);
 			break;
 		default:
 			assert compType <= JPEG_TYPE : "Compression control byte is incorrect!";
-			processBasicType(compControl, reader, renderer, rect);
+			processBasicType(compControl, transport, renderer, rect);
 		}
 	}
 
-	private void processBasicType(int compControl, Reader reader,
+	private void processBasicType(int compControl, Transport transport,
 			Renderer renderer, FramebufferUpdateRectangle rect) throws TransportException {
 		decoderId = (compControl & STREAM_ID_MASK) >> 4;
 
 		int filterId = 0;
 		if ((compControl & FILTER_ID_MASK) > 0) { // filter byte presence
-			filterId = reader.readUInt8();
+			filterId = transport.readUInt8();
 		}
 		int bytesPerCPixel = renderer.getBytesPerPixelTight();
 		int lengthCurrentbpp = bytesPerCPixel * rect.width * rect.height;
 		byte [] buffer;
 		switch (filterId) {
 		case BASIC_FILTER:
-			buffer = readTightData(lengthCurrentbpp, reader);
+			buffer = readTightData(lengthCurrentbpp, transport);
 			renderer.drawTightBytes(buffer, 0, rect.x, rect.y, rect.width, rect.height);
 			break;
 		case PALETTE_FILTER:
-			int paletteSize = reader.readUInt8() + 1;
-            completePalette(paletteSize, reader, renderer);
+			int paletteSize = transport.readUInt8() + 1;
+            completePalette(paletteSize, transport, renderer);
 			int dataLength = paletteSize == 2 ?
 				rect.height * ((rect.width + 7) / 8) :
 				rect.width * rect.height;
-			buffer = readTightData(dataLength, reader);
+			buffer = readTightData(dataLength, transport);
 			renderer.drawBytesWithPalette(buffer, rect, palette, paletteSize);
 			break;
 		case GRADIENT_FILTER:
@@ -137,7 +136,7 @@ public class TightDecoder extends Decoder {
  * Here V[i,j] is the intensity of a color component for a pixel at
  * coordinates (i,j). MAX is the maximum value of intensity for a color
  * component.*/
-			buffer = readTightData(bytesPerCPixel * rect.width * rect.height, reader);
+			buffer = readTightData(bytesPerCPixel * rect.width * rect.height, transport);
 			byte [][] opRows = new byte[2][rect.width * 3 + 3];
 			int opRowIndex = 0;
 			byte [] components = new byte[3];
@@ -174,9 +173,9 @@ public class TightDecoder extends Decoder {
 	}
 
 	/**
-	 * Complete palette from reader
+	 * Complete palette from transport
 	 */
-	private void completePalette(int paletteSize, Reader reader, Renderer renderer) throws TransportException {
+	private void completePalette(int paletteSize, Transport transport, Renderer renderer) throws TransportException {
 		/**
 		 * When bytesPerPixel == 1 && paletteSize == 2 read 2 bytes of palette
 		 * When bytesPerPixel == 1 && paletteSize != 2 - error
@@ -185,7 +184,7 @@ public class TightDecoder extends Decoder {
 		 */
         if (null == palette) palette = new int[256];
 		for (int i = 0; i < paletteSize; ++i) {
-			palette[i] = renderer.readTightPixelColor(reader);
+			palette[i] = renderer.readTightPixelColor(transport);
 		}
 	}
 
@@ -194,17 +193,17 @@ public class TightDecoder extends Decoder {
 	 * uncompressed data. When compressed decompresses it.
 	 *
 	 * @param expectedLength expected data length in bytes
-	 * @param reader data source
+	 * @param transport data source
 	 * @return result data
 	 * @throws TransportException
 	 */
-	private byte[] readTightData(int expectedLength, Reader reader) throws TransportException {
+	private byte[] readTightData(int expectedLength, Transport transport) throws TransportException {
 		if (expectedLength < MIN_SIZE_TO_COMPRESS) {
 			byte [] buffer = ByteBuffer.getInstance().getBuffer(expectedLength);
-			reader.readBytes(buffer, 0, expectedLength);
+			transport.readBytes(buffer, 0, expectedLength);
 			return buffer;
 		} else
-			return readCompressedData(expectedLength, reader);
+			return readCompressedData(expectedLength, transport);
 	}
 
 	/**
@@ -215,16 +214,16 @@ public class TightDecoder extends Decoder {
      * which need to be ignored. Use only first expectedLength bytes.
      *
 	 * @param expectedLength expected data length
-	 * @param reader data source
+	 * @param transport data source
 	 * @return decompressed data (length == expectedLength) / + followed raw data (ignore, please)
 	 * @throws TransportException
 	 */
-	private byte[] readCompressedData(int expectedLength, Reader reader) throws TransportException {
-		int rawDataLength = readCompactSize(reader);
+	private byte[] readCompressedData(int expectedLength, Transport transport) throws TransportException {
+		int rawDataLength = readCompactSize(transport);
 
 		byte [] buffer = ByteBuffer.getInstance().getBuffer(expectedLength + rawDataLength);
 		// read compressed (raw) data behind space allocated for decompressed data
-		reader.readBytes(buffer, expectedLength, rawDataLength);
+		transport.readBytes(buffer, expectedLength, rawDataLength);
 		if (null == decoders[decoderId]) {
 			decoders[decoderId] = new Inflater();
 		}
@@ -239,32 +238,32 @@ public class TightDecoder extends Decoder {
 		return buffer;
 	}
 
-	private void processJpegType(Reader reader, Renderer renderer,
+	private void processJpegType(Transport transport, Renderer renderer,
 			FramebufferUpdateRectangle rect) throws TransportException {
-		int jpegBufferLength = readCompactSize(reader);
+		int jpegBufferLength = readCompactSize(transport);
 		byte [] bytes = ByteBuffer.getInstance().getBuffer(jpegBufferLength);
-		reader.readBytes(bytes, 0, jpegBufferLength);
+		transport.readBytes(bytes, 0, jpegBufferLength);
 		renderer.drawJpegImage(bytes, 0, jpegBufferLength, rect);
 	}
 
 	/**
-	 * Read an integer from reader in compact representation (from 1 to 3 bytes).
+	 * Read an integer from transport in compact representation (from 1 to 3 bytes).
 	 * Highest bit of read byte set to 1 means next byte contains data.
 	 * Lower 7 bit of each byte contains significant data. Max bytes = 3.
 	 * Less significant bytes first order.
 	 *
-	 * @param reader data source
+	 * @param transport data source
 	 * @return int value
 	 * @throws TransportException
 	 */
-	private int readCompactSize(Reader reader) throws TransportException {
-		int b = reader.readUInt8();
+	private int readCompactSize(Transport transport) throws TransportException {
+		int b = transport.readUInt8();
 		int size = b & 0x7F;
 		if ((b & 0x80) != 0) {
-			b = reader.readUInt8();
+			b = transport.readUInt8();
 			size += (b & 0x7F) << 7;
 			if ((b & 0x80) != 0) {
-				size += reader.readUInt8() << 14;
+				size += transport.readUInt8() << 14;
 			}
 		}
 		return size;

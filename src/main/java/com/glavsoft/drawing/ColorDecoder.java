@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,14 +19,13 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.drawing;
 
 import com.glavsoft.exceptions.TransportException;
 import com.glavsoft.rfb.encoding.PixelFormat;
-import com.glavsoft.transport.Reader;
+import com.glavsoft.transport.Transport;
 
 public class ColorDecoder {
     protected byte redShift;
@@ -75,18 +74,23 @@ public class ColorDecoder {
 				255 == redMax && 255 == greenMax && 255 == blueMax;
 	}
 
-	protected int readColor(Reader reader) throws TransportException {
-		return getColor(reader.readBytes(buff, 0, bytesPerPixel), 0);
+	protected int readColor(Transport transport) throws TransportException {
+		return getColor(transport.readBytes(buff, 0, bytesPerPixel), 0);
 	}
 
-	protected int readCompactColor(Reader reader) throws TransportException {
-		return getCompactColor(reader.readBytes(buff, 0, bytesPerCPixel), 0);
+	protected int readCompactColor(Transport transport) throws TransportException {
+		return getCompactColor(transport.readBytes(buff, 0, bytesPerCPixel), 0);
 	}
 
-	protected int readTightColor(Reader reader) throws TransportException {
-		return getTightColor(reader.readBytes(buff, 0, bytesPerPixelTight), 0);
+	protected int readTightColor(Transport transport) throws TransportException {
+		return getTightColor(transport.readBytes(buff, 0, bytesPerPixelTight), 0);
 	}
 
+    /**
+     * Convert rfb encoded pixel color into 0x00rrggbb int value.
+     * @param rawColor - bytes are ordered in right sequence (little/big endian transformations already done
+     * @return 0x00rrggbb
+     */
 	protected int convertColor(int rawColor) {
 		return  255 * (rawColor >> redShift & redMax) / redMax << 16 |
 				255 * (rawColor >> greenShift & greenMax) / greenMax << 8 |

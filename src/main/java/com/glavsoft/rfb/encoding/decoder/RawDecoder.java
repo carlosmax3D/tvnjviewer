@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,14 +19,13 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.encoding.decoder;
 
 import com.glavsoft.drawing.Renderer;
 import com.glavsoft.exceptions.TransportException;
-import com.glavsoft.transport.Reader;
+import com.glavsoft.transport.Transport;
 
 public class RawDecoder extends Decoder {
 	private static RawDecoder instance = new RawDecoder();
@@ -36,16 +35,16 @@ public class RawDecoder extends Decoder {
 	private RawDecoder() { /*empty*/ }
 
 	@Override
-	public void decode(Reader reader,
+	public void decode(Transport transport,
 			Renderer renderer, FramebufferUpdateRectangle rect) throws TransportException {
-		decode(reader, renderer, rect.x, rect.y, rect.width, rect.height);
+		decode(transport, renderer, rect.x, rect.y, rect.width, rect.height);
 	}
 
-	public void decode(Reader reader, Renderer renderer, int x, int y,
+	public void decode(Transport transport, Renderer renderer, int x, int y,
 			int width, int height) throws TransportException {
 		int length = width * height * renderer.getBytesPerPixel();
 		byte [] bytes = ByteBuffer.getInstance().getBuffer(length);
-		reader.readBytes(bytes, 0, length);
+		transport.readBytes(bytes, 0, length);
 		renderer.drawBytes(bytes, x, y, width, height);
 	}
 

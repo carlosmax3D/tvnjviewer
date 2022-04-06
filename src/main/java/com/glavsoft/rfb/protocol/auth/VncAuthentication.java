@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,24 +19,23 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.protocol.auth;
 
 import com.glavsoft.exceptions.CryptoException;
 import com.glavsoft.exceptions.FatalException;
 import com.glavsoft.exceptions.TransportException;
-import com.glavsoft.rfb.CapabilityContainer;
-import com.glavsoft.rfb.IPasswordRetriever;
-import com.glavsoft.transport.Reader;
-import com.glavsoft.transport.Writer;
+import com.glavsoft.rfb.protocol.Protocol;
+import com.glavsoft.transport.Transport;
 
 import javax.crypto.*;
 import javax.crypto.spec.DESKeySpec;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
+
+import static com.glavsoft.utils.Strings.getBytesWithCharset;
 
 public class VncAuthentication extends AuthHandler {
 	@Override
@@ -45,21 +44,20 @@ public class VncAuthentication extends AuthHandler {
 	}
 
 	@Override
-	public boolean authenticate(Reader reader,
-			Writer writer, CapabilityContainer authCaps, IPasswordRetriever passwordRetriever)
+	public Transport authenticate(Transport transport, Protocol protocol)
 	throws TransportException, FatalException {
-		byte [] challenge = reader.readBytes(16);
-		String password = passwordRetriever.getPassword();
-        if (null == password) return false;
+		byte [] challenge = transport.readBytes(16);
+		String password = protocol.getPasswordRetriever().getResult();
+        if (null == password) password = "";
 		byte [] key = new byte[8];
-        System.arraycopy(password.getBytes(), 0, key, 0, Math.min(key.length, password.getBytes().length));
-	    writer.write(encrypt(challenge, key));
-	    return false;
+        System.arraycopy(getBytesWithCharset(password, Transport.ISO_8859_1), 0, key, 0, Math.min(key.length, getBytesWithCharset(password, Transport.ISO_8859_1).length));
+	    transport.write(encrypt(challenge, key)).flush();
+        return transport;
 	}
 
   /**
-	 * Encript challenge by key using DES
-	 * @return encripted bytes
+	 * Encrypt challenge by key using DES
+	 * @return encrypted bytes
 	 * @throws CryptoException on problem with DES algorithm support or smth about
 	 */
 	public byte[] encrypt(byte[] challenge, byte[] key) throws CryptoException {

@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,15 +19,14 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb;
 
 import com.glavsoft.drawing.Renderer;
 import com.glavsoft.rfb.encoding.PixelFormat;
 import com.glavsoft.rfb.encoding.decoder.FramebufferUpdateRectangle;
-import com.glavsoft.transport.Reader;
+import com.glavsoft.transport.Transport;
 
 /**
  * Interface for sending repaint event from worker thread to GUI thread
@@ -37,6 +36,6 @@ public interface IRepaintController extends IChangeSettingsListener {
 	void repaintBitmap(int x, int y, int width, int height);
 	void repaintCursor();
 	void updateCursorPosition(short x, short y);
-	Renderer createRenderer(Reader reader, int width, int height, PixelFormat pixelFormat);
+	Renderer createRenderer(Transport transport, int width, int height, PixelFormat pixelFormat);
 	void setPixelFormat(PixelFormat pixelFormat);
 }

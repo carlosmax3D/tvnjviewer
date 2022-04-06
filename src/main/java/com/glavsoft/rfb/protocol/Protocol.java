@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,139 +19,65 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.protocol;
 
 import com.glavsoft.core.SettingsChangedEvent;
 import com.glavsoft.exceptions.*;
 import com.glavsoft.rfb.*;
-import com.glavsoft.rfb.client.ClientToServerMessage;
-import com.glavsoft.rfb.client.FramebufferUpdateRequestMessage;
-import com.glavsoft.rfb.client.SetEncodingsMessage;
-import com.glavsoft.rfb.client.SetPixelFormatMessage;
+import com.glavsoft.rfb.client.*;
+import com.glavsoft.rfb.encoding.EncodingType;
 import com.glavsoft.rfb.encoding.PixelFormat;
-import com.glavsoft.rfb.encoding.decoder.DecodersContainer;
-import com.glavsoft.rfb.protocol.state.HandshakeState;
-import com.glavsoft.rfb.protocol.state.ProtocolState;
-import com.glavsoft.transport.Reader;
-import com.glavsoft.transport.Writer;
+import com.glavsoft.rfb.encoding.decoder.*;
+import com.glavsoft.rfb.protocol.handlers.Handshaker;
+import com.glavsoft.rfb.protocol.tunnel.TunnelType;
+import com.glavsoft.transport.BaudrateMeter;
+import com.glavsoft.transport.Transport;
 
+import java.util.*;
 import java.util.logging.Logger;
 
-public class Protocol implements ProtocolContext, IChangeSettingsListener {
-	private ProtocolState state;
+public class Protocol implements IChangeSettingsListener {
+    private final ProtocolContext context;
 	private final Logger logger;
-	private final IPasswordRetriever passwordRetriever;
-	private final ProtocolSettings settings;
-	private int fbWidth;
-	private int fbHeight;
-	private PixelFormat pixelFormat;
-	private final Reader reader;
-	private final Writer writer;
-	private String remoteDesktopName;
+	private final IRequestString passwordRetriever;
 	private MessageQueue messageQueue;
-	private final DecodersContainer decoders;
 	private SenderTask senderTask;
 	private ReceiverTask receiverTask;
 	private IRfbSessionListener rfbSessionListener;
 	private IRepaintController repaintController;
-	private PixelFormat serverPixelFormat;
 	private Thread senderThread;
 	private Thread receiverThread;
-    private boolean isTight;
-    private String protocolVersion;
+    private PixelFormat serverPixelFormat;
 
-    public Protocol(Reader reader, Writer writer,
-			IPasswordRetriever passwordRetriever, ProtocolSettings settings) {
-		this.reader = reader;
-		this.writer = writer;
-		this.passwordRetriever = passwordRetriever;
-		this.settings = settings;
-		decoders = new DecodersContainer();
-		decoders.instantiateDecodersWhenNeeded(settings.encodings);
-		state = new HandshakeState(this);
+    private final Map<EncodingType, Decoder> decoders = new LinkedHashMap<EncodingType, Decoder>();
+    private final Set<ClientMessageType> clientMessageTypes = new HashSet<ClientMessageType>();
+    private boolean inCleanUp = false;
+    private boolean isMac;
+    private BaudrateMeter baudrateMeter;
+    private IRequestString connectionIdRetriever;
+
+    public Protocol(Transport transport, IRequestString passwordRetriever, ProtocolSettings settings) {
+        context = new ProtocolContext();
+        context.transport = transport;
+        this.passwordRetriever = passwordRetriever;
         logger = Logger.getLogger(getClass().getName());
+        context.settings = settings;
+        decoders.put(EncodingType.RAW_ENCODING, RawDecoder.getInstance());
     }
-
-	@Override
-	public void changeStateTo(ProtocolState state) {
-		this.state = state;
-	}
 
 	public void handshake() throws UnsupportedProtocolVersionException, UnsupportedSecurityTypeException,
 			AuthenticationFailedException, TransportException, FatalException {
-		while (state.next()) {
-			// continue;
-		}
-		this.messageQueue = new MessageQueue();
+        context.transport = new Handshaker(this).handshake(getTransport());
+		messageQueue = new MessageQueue(); // TODO Why here?
 	}
 
-	@Override
-	public PixelFormat getPixelFormat() {
-		return pixelFormat;
-	}
-
-	@Override
-	public void setPixelFormat(PixelFormat pixelFormat) {
-		this.pixelFormat = pixelFormat;
-		if (repaintController != null) {
-			repaintController.setPixelFormat(pixelFormat);
-		}
-	}
-
-	@Override
-	public String getRemoteDesktopName() {
-		return remoteDesktopName;
-	}
-
-	@Override
-	public void setRemoteDesktopName(String name) {
-		remoteDesktopName = name;
-	}
-
-	@Override
-	public int getFbWidth() {
-		return fbWidth;
-	}
-
-	@Override
-	public void setFbWidth(int fbWidth) {
-		this.fbWidth = fbWidth;
-	}
-
-	@Override
-	public int getFbHeight() {
-		return fbHeight;
-	}
-
-	@Override
-	public void setFbHeight(int fbHeight) {
-		this.fbHeight = fbHeight;
-	}
-
-	@Override
-	public IPasswordRetriever getPasswordRetriever() {
+    public IRequestString getPasswordRetriever() {
 		return passwordRetriever;
 	}
 
-	@Override
-	public ProtocolSettings getSettings() {
-		return settings;
-	}
-
-    @Override
-	public Writer getWriter() {
-		return writer;
-	}
-
-	@Override
-	public Reader getReader() {
-		return reader;
-	}
-
-	/**
+    /**
 	 * Following the server initialisation message it's up to the client to send
 	 * whichever protocol messages it wants.  Typically it will send a
 	 * SetPixelFormat message and a SetEncodings message, followed by a
@@ -170,32 +96,42 @@ public class Protocol implements ProtocolContext, IChangeSettingsListener {
 //		if (settings.getColorDepth() == 0) {
 //			settings.setColorDepth(pixelFormat.depth); // the same the server sent when not initialized yet
 //		}
-		serverPixelFormat = pixelFormat;
         correctServerPixelFormat();
-		setPixelFormat(createPixelFormat(settings));
-		sendMessage(new SetPixelFormatMessage(pixelFormat));
-		logger.fine("sent: " + pixelFormat);
+		context.setPixelFormat(createPixelFormat(context.settings));
+		sendMessage(new SetPixelFormatMessage(context.pixelFormat));
+		logger.fine("sent: " + context.pixelFormat);
 
-		sendSupportedEncodingsMessage(settings);
-		settings.addListener(this); // to support pixel format (color depth), and encodings changes
-		settings.addListener(repaintController);
+		sendSupportedEncodingsMessage(context.settings);
+		context.settings.addListener(Protocol.this); // to support pixel format (color depth), and encodings changes
+		context.settings.addListener(repaintController);
 
 		sendRefreshMessage();
-		senderTask = new SenderTask(messageQueue, writer, this);
-		senderThread = new Thread(senderTask, "RfbSenderTask");
-		senderThread.start();
-		decoders.resetDecoders();
+        senderTask = new SenderTask(messageQueue, context.transport, Protocol.this);
+        senderThread = new Thread(senderTask, "RfbSenderTask");
+        senderThread.start();
+		resetDecoders();
 		receiverTask = new ReceiverTask(
-				reader, repaintController,
+                context.transport, repaintController,
 				clipboardController,
-				decoders, this);
-		receiverThread = new Thread(receiverTask, "RfbReceiverTask");
+                Protocol.this, baudrateMeter);
+        receiverThread = new Thread(receiverTask, "RfbReceiverTask");
 		receiverThread.start();
 	}
 
     private void correctServerPixelFormat() {
-        // correct true color flag - we don't support color maps, so always set it up
-        serverPixelFormat.trueColourFlag = 1;
+        // correct true color flag
+        if (0 == serverPixelFormat.trueColourFlag) {
+            //we don't support color maps, so always set true color flag up
+            //and select closest convenient value for bpp/depth
+            int depth = serverPixelFormat.depth;
+            if (0 == depth) depth = serverPixelFormat.bitsPerPixel;
+            if (0 == depth) depth = 24;
+            if (depth <= 3) serverPixelFormat = PixelFormat.create3bitColorDepthPixelFormat(serverPixelFormat.bigEndianFlag);
+            else if (depth <= 6) serverPixelFormat = PixelFormat.create6bitColorDepthPixelFormat(serverPixelFormat.bigEndianFlag);
+            else if (depth <= 8) serverPixelFormat = PixelFormat.create8bitColorDepthBGRPixelFormat(serverPixelFormat.bigEndianFlag);
+            else if (depth <= 16) serverPixelFormat = PixelFormat.create16bitColorDepthPixelFormat(serverPixelFormat.bigEndianFlag);
+            else serverPixelFormat = PixelFormat.create24bitColorDepthPixelFormat(serverPixelFormat.bigEndianFlag);
+        }
         // correct .depth to use actual depth 24 instead of incorrect 32, used by ex. UltraVNC server, that cause
         // protocol incompatibility in ZRLE encoding
         final long significant = serverPixelFormat.redMax << serverPixelFormat.redShift |
@@ -208,14 +144,57 @@ public class Protocol implements ProtocolContext, IChangeSettingsListener {
         }
     }
 
-    @Override
-	public void sendMessage(ClientToServerMessage message) {
+    public void sendMessage(ClientToServerMessage message) {
 		messageQueue.put(message);
 	}
 
-	private void sendSupportedEncodingsMessage(ProtocolSettings settings) {
-		decoders.instantiateDecodersWhenNeeded(settings.encodings);
-		SetEncodingsMessage encodingsMessage = new SetEncodingsMessage(settings.encodings);
+    public void sendSupportedEncodingsMessage(ProtocolSettings settings) {
+        final LinkedHashSet<EncodingType> encodings = new LinkedHashSet<EncodingType>();
+        final EncodingType preferredEncoding = settings.getPreferredEncoding();
+        if (preferredEncoding != EncodingType.RAW_ENCODING) {
+            encodings.add(preferredEncoding); // preferred first
+        }
+        for (final EncodingType e : decoders.keySet()) {
+            if (e == preferredEncoding) continue;
+            switch (e) {
+                case RAW_ENCODING: break;
+                case COMPRESS_LEVEL_0 :
+                    final int compressionLevel = settings.getCompressionLevel();
+                    if (compressionLevel > 0 && compressionLevel < 10) {
+                        encodings.add(EncodingType.byId(EncodingType.COMPRESS_LEVEL_0.getId() + compressionLevel));
+                    }
+                    break;
+                case JPEG_QUALITY_LEVEL_0 :
+                    final int jpegQuality = settings.getJpegQuality();
+                    final int colorDepth = settings.getColorDepth();
+                    if (jpegQuality > 0 && jpegQuality < 10 &&
+                        (colorDepth == ProtocolSettings.COLOR_DEPTH_24 ||
+                        colorDepth == ProtocolSettings.COLOR_DEPTH_SERVER_SETTINGS)) {
+                            encodings.add(EncodingType.byId(EncodingType.JPEG_QUALITY_LEVEL_0.getId() + jpegQuality));
+                    }
+                    break;
+                case COPY_RECT:
+                    if (settings.isAllowCopyRect()) {
+                        encodings.add(EncodingType.COPY_RECT);
+                    }
+                    break;
+                case RICH_CURSOR:
+                    if (settings.getMouseCursorTrack() == LocalPointer.HIDE ||
+                            settings.getMouseCursorTrack() == LocalPointer.ON) {
+                        encodings.add(EncodingType.RICH_CURSOR);
+                    }
+                    break;
+                case CURSOR_POS:
+                    if (settings.getMouseCursorTrack() == LocalPointer.HIDE ||
+                            settings.getMouseCursorTrack() == LocalPointer.ON) {
+                        encodings.add(EncodingType.CURSOR_POS);
+                    }
+                    break;
+                default:
+                    encodings.add(e);
+            }
+        }
+		SetEncodingsMessage encodingsMessage = new SetEncodingsMessage(encodings);
 		sendMessage(encodingsMessage);
 		logger.fine("sent: " + encodingsMessage.toString());
 	}
@@ -231,11 +210,11 @@ public class Protocol implements ProtocolContext, IChangeSettingsListener {
 		case ProtocolSettings.COLOR_DEPTH_16:
 			return PixelFormat.create16bitColorDepthPixelFormat(serverBigEndianFlag);
 		case ProtocolSettings.COLOR_DEPTH_8:
-			return PixelFormat.create8bitColorDepthBGRPixelFormat(serverBigEndianFlag);
+            return hackForMacOsXScreenSharingServer(PixelFormat.create8bitColorDepthBGRPixelFormat(serverBigEndianFlag));
 		case ProtocolSettings.COLOR_DEPTH_6:
-			return PixelFormat.create6bitColorDepthPixelFormat(serverBigEndianFlag);
+			return hackForMacOsXScreenSharingServer(PixelFormat.create6bitColorDepthPixelFormat(serverBigEndianFlag));
 		case ProtocolSettings.COLOR_DEPTH_3:
-			return PixelFormat.create3bppPixelFormat(serverBigEndianFlag);
+			return hackForMacOsXScreenSharingServer(PixelFormat.create3bitColorDepthPixelFormat(serverBigEndianFlag));
 		case ProtocolSettings.COLOR_DEPTH_SERVER_SETTINGS:
 			return serverPixelFormat;
 		default:
@@ -244,7 +223,14 @@ public class Protocol implements ProtocolContext, IChangeSettingsListener {
 		}
 	}
 
-	@Override
+    private PixelFormat hackForMacOsXScreenSharingServer(PixelFormat pixelFormat) {
+        if (isMac) {
+            pixelFormat.bitsPerPixel = pixelFormat.depth = 16;
+        }
+        return pixelFormat;
+    }
+
+    @Override
 	public void settingsChanged(SettingsChangedEvent e) {
 		ProtocolSettings settings = (ProtocolSettings) e.getSource();
 		if (settings.isChangedEncodings()) {
@@ -255,21 +241,27 @@ public class Protocol implements ProtocolContext, IChangeSettingsListener {
 		}
 	}
 
-	@Override
 	public void sendRefreshMessage() {
-		sendMessage(new FramebufferUpdateRequestMessage(0, 0, fbWidth, fbHeight, false));
+		sendMessage(new FramebufferUpdateRequestMessage(0, 0, context.fbWidth, context.fbHeight, false));
 		logger.fine("sent: full FB Refresh");
 	}
 
-	@Override
-	public void cleanUpSession(String message) {
+    public void sendFbUpdateMessage() {
+        sendMessage(receiverTask.fullscreenFbUpdateIncrementalRequest);
+    }
+
+    public void cleanUpSession(String message) {
 		cleanUpSession();
 		rfbSessionListener.rfbSessionStopped(message);
 	}
 
-	public synchronized void cleanUpSession() {
-		if (senderTask != null) { senderTask.stopTask(); }
-		if (receiverTask != null) { receiverTask.stopTask(); }
+	public void cleanUpSession() {
+        synchronized (this) {
+            if (inCleanUp) return;
+            inCleanUp = true;
+        }
+		if (senderTask != null && senderThread.isAlive()) { senderThread.interrupt(); }
+		if (receiverTask != null && receiverThread.isAlive()) { receiverThread.interrupt(); }
 		if (senderTask != null) {
 			try {
 				senderThread.join(1000);
@@ -286,26 +278,168 @@ public class Protocol implements ProtocolContext, IChangeSettingsListener {
 			}
 			receiverTask = null;
 		}
+        synchronized (this) {
+            inCleanUp = false;
+        }
+        ByteBuffer.removeInstance();
 	}
 
-    @Override
+    public void setServerPixelFormat(PixelFormat serverPixelFormat) {
+        this.serverPixelFormat = serverPixelFormat;
+    }
+
+    public ProtocolSettings getSettings() {
+        return context.getSettings();
+    }
+
+    public Transport getTransport() {
+        return context.getTransport();
+    }
+
+    public int getFbWidth() {
+        return context.getFbWidth();
+    }
+
+    public void setFbWidth(int frameBufferWidth) {
+        context.setFbWidth(frameBufferWidth);
+    }
+
+    public int getFbHeight() {
+        return context.getFbHeight();
+    }
+
+    public void setFbHeight(int frameBufferHeight) {
+        context.setFbHeight(frameBufferHeight);
+    }
+
+    public PixelFormat getPixelFormat() {
+        return context.getPixelFormat();
+    }
+
+    public void setPixelFormat(PixelFormat pixelFormat) {
+        context.setPixelFormat(pixelFormat);
+        if (repaintController != null) {
+            repaintController.setPixelFormat(pixelFormat);
+        }
+    }
+
+    public void setRemoteDesktopName(String name) {
+        context.setRemoteDesktopName(name);
+    }
+
+    public String getRemoteDesktopName() {
+        return context.getRemoteDesktopName();
+    }
+
     public void setTight(boolean isTight) {
-        this.isTight = isTight;
+        context.setTight(isTight);
     }
 
-    @Override
     public boolean isTight() {
-        return isTight;
+        return context.isTight();
     }
 
-    @Override
-    public void setProtocolVersion(String protocolVersion) {
-        this.protocolVersion = protocolVersion;
+    public void setProtocolVersion(Handshaker.ProtocolVersion protocolVersion) {
+        context.setProtocolVersion(protocolVersion);
     }
 
-    @Override
-    public String getProtocolVersion() {
-        return protocolVersion;
+    public Handshaker.ProtocolVersion getProtocolVersion() {
+        return context.getProtocolVersion();
     }
 
+    public void registerRfbEncodings() {
+        decoders.put(EncodingType.TIGHT, new TightDecoder());
+        decoders.put(EncodingType.HEXTILE, new HextileDecoder());
+        decoders.put(EncodingType.ZRLE, new ZRLEDecoder());
+        decoders.put(EncodingType.ZLIB, new ZlibDecoder());
+        decoders.put(EncodingType.RRE, new RREDecoder());
+        decoders.put(EncodingType.COPY_RECT, new CopyRectDecoder());
+
+        decoders.put(EncodingType.RICH_CURSOR, new RichCursorDecoder());
+        decoders.put(EncodingType.DESKTOP_SIZE, new DesctopSizeDecoder());
+        decoders.put(EncodingType.CURSOR_POS, new CursorPosDecoder());
+    }
+
+    public void resetDecoders() {
+        for (Decoder decoder : decoders.values()) {
+            if (decoder != null) {
+                decoder.reset();
+            }
+        }
+    }
+
+    public Decoder getDecoderByType(EncodingType type) {
+        return decoders.get(type);
+    }
+
+    public void registerEncoding(RfbCapabilityInfo capInfo) {
+        try {
+            final EncodingType encodingType = EncodingType.byId(capInfo.getCode());
+            if ( ! decoders.containsKey(encodingType)) {
+                final Decoder decoder = encodingType.klass.newInstance();
+                if (decoder != null) {
+                    decoders.put(encodingType, decoder);
+                    logger.finer("Register encoding: " + encodingType);
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            logger.finer(e.getMessage());
+        } catch (InstantiationException e) {
+            logger.warning(e.getMessage());
+        } catch (IllegalAccessException e) {
+            logger.warning(e.getMessage());
+        }
+    }
+
+    public void registerClientMessageType(RfbCapabilityInfo capInfo) {
+        try {
+            final ClientMessageType clientMessageType = ClientMessageType.byId(capInfo.getCode());
+            clientMessageTypes.add(clientMessageType);
+            logger.finer("Register client message type: " + clientMessageType);
+        } catch (IllegalArgumentException e) {
+            logger.finer(e.getMessage());
+        }
+    }
+
+    /**
+     * Check whether server is supported for given client-to-server message
+     *
+     * @param type client-to-server message type to check for
+     * @return true when supported
+     */
+    public boolean isSupported(ClientMessageType type) {
+        return clientMessageTypes.contains(type) || ClientMessageType.isStandardType(type   );
+    }
+
+    public void setTunnelType(TunnelType tunnelType) {
+        context.setTunnelType(tunnelType);
+    }
+
+    public TunnelType getTunnelType() {
+        return context.getTunnelType();
+    }
+
+    public void setMac(boolean isMac) {
+        this.isMac = isMac;
+    }
+
+    public void setBaudrateMeter(BaudrateMeter baudrateMeter) {
+        this.baudrateMeter = baudrateMeter;
+    }
+
+    public int kBPS() {
+    return baudrateMeter == null ? -1 : baudrateMeter.kBPS();
+  }
+
+    public boolean isMac() {
+      return isMac;
+    }
+
+    public void setConnectionIdRetriever(IRequestString connectionIdRetriever) {
+        this.connectionIdRetriever = connectionIdRetriever;
+    }
+
+    public IRequestString getConnectionIdRetriever() {
+        return connectionIdRetriever;
+    }
 }

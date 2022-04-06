@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,14 +19,13 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.encoding.decoder;
 
 import com.glavsoft.drawing.Renderer;
 import com.glavsoft.exceptions.TransportException;
-import com.glavsoft.transport.Reader;
+import com.glavsoft.transport.Transport;
 
 import java.io.ByteArrayInputStream;
 import java.util.zip.DataFormatException;
@@ -36,22 +35,22 @@ public class ZlibDecoder extends Decoder {
 	private Inflater decoder;
 
 	@Override
-	public void decode(Reader reader, Renderer renderer,
+	public void decode(Transport transport, Renderer renderer,
 			FramebufferUpdateRectangle rect) throws TransportException {
-		int zippedLength = (int) reader.readUInt32();
+		int zippedLength = (int) transport.readUInt32();
 		if (0 == zippedLength) return;
 		int length = rect.width * rect.height * renderer.getBytesPerPixel();
-		byte[] bytes = unzip(reader, zippedLength, length);
-		Reader unzippedReader =
-			new Reader(
+		byte[] bytes = unzip(transport, zippedLength, length);
+		Transport unzippedReader =
+			new Transport(
 					new ByteArrayInputStream(bytes, zippedLength, length));
 		RawDecoder.getInstance().decode(unzippedReader, renderer, rect);
 	}
 
-	protected byte[] unzip(Reader reader, int zippedLength, int length)
+	protected byte[] unzip(Transport transport, int zippedLength, int length)
 			throws TransportException {
 		byte [] bytes = ByteBuffer.getInstance().getBuffer(zippedLength + length);
-		reader.readBytes(bytes, 0, zippedLength);
+		transport.readBytes(bytes, 0, zippedLength);
 		if (null == decoder) {
 			decoder = new Inflater();
 		}

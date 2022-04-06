@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,54 +19,87 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.protocol;
 
-import com.glavsoft.rfb.IPasswordRetriever;
-import com.glavsoft.rfb.client.ClientToServerMessage;
 import com.glavsoft.rfb.encoding.PixelFormat;
-import com.glavsoft.rfb.protocol.state.ProtocolState;
-import com.glavsoft.transport.Reader;
-import com.glavsoft.transport.Writer;
+import com.glavsoft.rfb.protocol.handlers.Handshaker;
+import com.glavsoft.rfb.protocol.tunnel.TunnelType;
+import com.glavsoft.transport.Transport;
 
-import java.util.logging.Logger;
+public class ProtocolContext {
+    int fbWidth;
+    int fbHeight;
+    PixelFormat pixelFormat;
+    Transport transport;
+    String remoteDesktopName;
+    boolean isTight;
+    Handshaker.ProtocolVersion protocolVersion;
+    ProtocolSettings settings;
+    private TunnelType tunnelType;
 
-public interface ProtocolContext {
+    public PixelFormat getPixelFormat() {
+        return pixelFormat;
+    }
 
-	void changeStateTo(ProtocolState state);
+    public void setPixelFormat(PixelFormat pixelFormat) {
+        this.pixelFormat = pixelFormat;
+    }
 
-	IPasswordRetriever getPasswordRetriever();
+    public String getRemoteDesktopName() {
+        return remoteDesktopName;
+    }
 
-	ProtocolSettings getSettings();
+    public void setRemoteDesktopName(String name) {
+        remoteDesktopName = name;
+    }
 
-    Writer getWriter();
-	Reader getReader();
+    public int getFbWidth() {
+        return fbWidth;
+    }
 
-	int getFbWidth();
-	void setFbWidth(int frameBufferWidth);
+    public void setFbWidth(int fbWidth) {
+        this.fbWidth = fbWidth;
+    }
 
-	int getFbHeight();
-	void setFbHeight(int frameBufferHeight);
+    public int getFbHeight() {
+        return fbHeight;
+    }
 
-	PixelFormat getPixelFormat();
-	void setPixelFormat(PixelFormat pixelFormat);
+    public void setFbHeight(int fbHeight) {
+        this.fbHeight = fbHeight;
+    }
 
-	void setRemoteDesktopName(String name);
+    public ProtocolSettings getSettings() {
+        return settings;
+    }
 
-	void sendMessage(ClientToServerMessage message);
+    public Transport getTransport() {
+        return transport;
+    }
 
-	String getRemoteDesktopName();
+    public void setTight(boolean isTight) {
+        this.isTight = isTight;
+    }
 
-	void sendRefreshMessage();
-	
-	void cleanUpSession(String message);
+    public boolean isTight() {
+        return isTight;
+    }
 
-    void setTight(boolean isTight);
-	boolean isTight();
+    public void setProtocolVersion(Handshaker.ProtocolVersion protocolVersion) {
+        this.protocolVersion = protocolVersion;
+    }
 
-    void setProtocolVersion(String protocolVersion);
-    String getProtocolVersion();
+    public Handshaker.ProtocolVersion getProtocolVersion() {
+        return protocolVersion;
+    }
 
+    public void setTunnelType(TunnelType tunnelType) {
+        this.tunnelType = tunnelType;
+    }
+
+    public TunnelType getTunnelType() {
+        return tunnelType;
+    }
 }

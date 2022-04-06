@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,9 +19,8 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.protocol;
 
 import com.glavsoft.drawing.Renderer;
@@ -35,10 +34,9 @@ import com.glavsoft.rfb.client.SetPixelFormatMessage;
 import com.glavsoft.rfb.encoding.EncodingType;
 import com.glavsoft.rfb.encoding.PixelFormat;
 import com.glavsoft.rfb.encoding.decoder.Decoder;
-import com.glavsoft.rfb.encoding.decoder.DecodersContainer;
 import com.glavsoft.rfb.encoding.decoder.FramebufferUpdateRectangle;
-import com.glavsoft.rfb.encoding.decoder.RichCursorDecoder;
-import com.glavsoft.transport.Reader;
+import com.glavsoft.transport.BaudrateMeter;
+import com.glavsoft.transport.Transport;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -52,158 +50,154 @@ public class ReceiverTask implements Runnable {
 
 
 	private static Logger logger = Logger.getLogger("com.glavsoft.rfb.protocol.ReceiverTask");
-	private final Reader reader;
-	private volatile boolean isRunning = false;
+	private final Transport transport;
 	private Renderer renderer;
 	private final IRepaintController repaintController;
 	private final ClipboardController clipboardController;
-	private final DecodersContainer decoders;
-	private FramebufferUpdateRequestMessage fullscreenFbUpdateIncrementalRequest;
-	private final ProtocolContext context;
-	private PixelFormat pixelFormat;
-	private boolean needSendPixelFormat;
+    protected FramebufferUpdateRequestMessage fullscreenFbUpdateIncrementalRequest;
+    private final Protocol protocol;
+    private BaudrateMeter baudrateMeter;
+    private PixelFormat pixelFormat;
+    private volatile boolean needSendPixelFormat;
 
-	public ReceiverTask(Reader reader,
-	                    IRepaintController repaintController, ClipboardController clipboardController,
-	                    DecodersContainer decoders, ProtocolContext context) {
-		this.reader = reader;
+	public ReceiverTask(Transport transport,
+                        IRepaintController repaintController, ClipboardController clipboardController,
+                        Protocol protocol, BaudrateMeter baudrateMeter) {
+        this.transport = transport;
 		this.repaintController = repaintController;
 		this.clipboardController = clipboardController;
-		this.context = context;
-		this.decoders = decoders;
-		renderer = repaintController.createRenderer(reader, context.getFbWidth(), context.getFbHeight(),
-				context.getPixelFormat());
+		this.protocol = protocol;
+        this.baudrateMeter = baudrateMeter;
+        renderer = repaintController.createRenderer(transport, protocol.getFbWidth(), protocol.getFbHeight(),
+                protocol.getPixelFormat());
 		fullscreenFbUpdateIncrementalRequest =
-			new FramebufferUpdateRequestMessage(0, 0, context.getFbWidth(), context.getFbHeight(), true);
+			new FramebufferUpdateRequestMessage(0, 0, protocol.getFbWidth(), protocol.getFbHeight(), true);
 	}
 
 	@Override
 	public void run() {
-		isRunning = true;
-		while (isRunning) {
-			try {
-				byte messageId = reader.readByte();
+		try {
+			while ( ! Thread.currentThread().isInterrupted()) {
+				byte messageId = transport.readByte();
 				switch (messageId) {
-				case FRAMEBUFFER_UPDATE:
+					case FRAMEBUFFER_UPDATE:
 //					logger.fine("Server message: FramebufferUpdate (0)");
-					framebufferUpdateMessage();
-					break;
-				case SET_COLOR_MAP_ENTRIES:
-					logger.severe("Server message SetColorMapEntries is not implemented. Skip.");
-					setColorMapEntries();
-					break;
-				case BELL:
-					logger.fine("Server message: Bell");
-					System.out.print("\0007");
-				    System.out.flush();
-					break;
-				case SERVER_CUT_TEXT:
-					logger.fine("Server message: CutText (3)");
-					serverCutText();
-					break;
-				default:
-					logger.severe("Unsupported server message. Id = " + messageId);
+						framebufferUpdateMessage();
+						break;
+					case SET_COLOR_MAP_ENTRIES:
+						logger.severe("Server message SetColorMapEntries is not implemented. Skip.");
+						setColorMapEntries();
+						break;
+					case BELL:
+						logger.fine("Server message: Bell");
+						System.out.print("\0007");
+						System.out.flush();
+						break;
+					case SERVER_CUT_TEXT:
+						logger.fine("Server message: CutText (3)");
+						serverCutText();
+						break;
+					default:
+						logger.severe("Unsupported server message. Id = " + messageId);
 				}
-			} catch (TransportException e) {
-				if (isRunning) {
-                    logger.severe("Close session: " + e.getMessage());
-					context.cleanUpSession("Connection closed.");
-				}
-				stopTask();
-			} catch (ProtocolException e) {
-				logger.severe(e.getMessage());
-				if (isRunning) {
-					context.cleanUpSession(e.getMessage() + "\nConnection closed.");
-				}
-				stopTask();
-			} catch (CommonException e) {
-				logger.severe(e.getMessage());
-				if (isRunning) {
-					context.cleanUpSession("Connection closed..");
-				}
-				stopTask();
-			} catch (Throwable te) {
-				StringWriter sw = new StringWriter();
-				PrintWriter pw = new PrintWriter(sw);
-				te.printStackTrace(pw);
-				if (isRunning) {
-					context.cleanUpSession(te.getMessage() + "\n" + sw.toString());
-				}
-				stopTask();
 			}
+		} catch (TransportException e) {
+			logger.severe("Close session: " + e.getMessage());
+			protocol.cleanUpSession("Connection closed.");
+		} catch (ProtocolException e) {
+			logger.severe(e.getMessage());
+			protocol.cleanUpSession(e.getMessage() + "\nConnection closed.");
+		} catch (CommonException e) {
+			logger.severe(e.getMessage());
+			protocol.cleanUpSession("Connection closed..");
+		} catch (Throwable te) {
+			StringWriter sw = new StringWriter();
+			PrintWriter pw = new PrintWriter(sw);
+			te.printStackTrace(pw);
+			protocol.cleanUpSession(te.getMessage() + "\n" + sw.toString());
 		}
+		Logger.getLogger(getClass().getName()).finer("Receiver task stopped");
 	}
 
 	private void setColorMapEntries() throws TransportException {
-		reader.readByte();  // padding
-		reader.readUInt16(); // first color index
-		int length = reader.readUInt16();
+		transport.readByte();  // padding
+		transport.readUInt16(); // first color index
+		int length = transport.readUInt16();
 		while (length-- > 0) {
-			reader.readUInt16(); // R
-			reader.readUInt16(); // G
-			reader.readUInt16(); // B
+			transport.readUInt16(); // R
+			transport.readUInt16(); // G
+			transport.readUInt16(); // B
 		}
 	}
 
 	private void serverCutText() throws TransportException {
-		reader.readByte();  // padding
-		reader.readInt16(); // padding
-		int length = reader.readInt32() & Integer.MAX_VALUE;
-		clipboardController.updateSystemClipboard(reader.readBytes(length));
+		transport.readByte();  // padding
+		transport.readInt16(); // padding
+		long length = transport.readInt32();
+        if (0 == length) return;
+        if (length > Integer.MAX_VALUE) {
+            clipboardController.updateSystemClipboard(transport.readBytes(Integer.MAX_VALUE));
+            clipboardController.updateSystemClipboard(transport.readBytes((int) (length - Integer.MAX_VALUE)));
+        } else {
+            clipboardController.updateSystemClipboard(transport.readBytes((int) length));
+        }
 	}
 
 	public void framebufferUpdateMessage() throws CommonException {
-		reader.readByte(); // padding
-		int numberOfRectangles = reader.readUInt16();
+		transport.skip(1); // padding
+		int numberOfRectangles = transport.readUInt16();
 		while (numberOfRectangles-- > 0) {
 			FramebufferUpdateRectangle rect = new FramebufferUpdateRectangle();
-			rect.fill(reader);
+			rect.fill(transport);
 
-			Decoder decoder = decoders.getDecoderByType(rect.getEncodingType());
-			logger.finest(rect.toString() + (0 == numberOfRectangles ? "\n---" : ""));
+			Decoder decoder = protocol.getDecoderByType(rect.getEncodingType());
+//			logger.finer(rect.toString() + (0 == numberOfRectangles ? "\n---" : ""));
 			if (decoder != null) {
-				decoder.decode(reader, renderer, rect);
-				repaintController.repaintBitmap(rect);
-			} else if (rect.getEncodingType() == EncodingType.RICH_CURSOR) {
-				RichCursorDecoder.getInstance().decode(reader, renderer, rect);
-				repaintController.repaintCursor();
-			} else if (rect.getEncodingType() == EncodingType.CURSOR_POS) {
-				renderer.decodeCursorPosition(rect);
-				repaintController.repaintCursor();
-			} else if (rect.getEncodingType() == EncodingType.DESKTOP_SIZE) {
-				fullscreenFbUpdateIncrementalRequest =
-					new FramebufferUpdateRequestMessage(0, 0, rect.width, rect.height, true);
-				synchronized (renderer.getLock()) {
-					renderer = repaintController.createRenderer(reader, rect.width, rect.height,
-							context.getPixelFormat());
-				}
-				context.sendMessage(new FramebufferUpdateRequestMessage(0, 0, rect.width, rect.height, false));
-//				repaintController.repaintCursor();
-			} else
-				throw new CommonException("Unprocessed encoding: " + rect.toString());
-		}
-		synchronized (this) {
-			if (needSendPixelFormat) {
-				needSendPixelFormat = false;
-				context.setPixelFormat(pixelFormat);
-				context.sendMessage(new SetPixelFormatMessage(pixelFormat));
-				logger.fine("sent: "+pixelFormat);
-				context.sendRefreshMessage();
-				logger.fine("sent: nonincremental fb update");
+                try {
+                    if (baudrateMeter != null) baudrateMeter.startMeasuringCycle();
+                    decoder.decode(transport, renderer, rect);
+                } finally {
+                    if (baudrateMeter != null) baudrateMeter.stopMeasuringCycle();
+                }
+                if (EncodingType.RICH_CURSOR == rect.getEncodingType() ||
+                    EncodingType.CURSOR_POS == rect.getEncodingType()) {
+                    repaintController.repaintCursor();
+                } else if (rect.getEncodingType() == EncodingType.DESKTOP_SIZE) {
+                    synchronized (this) {
+                        fullscreenFbUpdateIncrementalRequest =
+                            new FramebufferUpdateRequestMessage(0, 0, rect.width, rect.height, true);
+                    }
+                    renderer = repaintController.createRenderer(transport, rect.width, rect.height,
+                            protocol.getPixelFormat());
+                    protocol.sendMessage(new FramebufferUpdateRequestMessage(0, 0, rect.width, rect.height, false));
+                    return;
+                } else {
+                    repaintController.repaintBitmap(rect);
+                }
 			} else {
-				context.sendMessage(fullscreenFbUpdateIncrementalRequest);
-			}
+				throw new CommonException("Unprocessed encoding: " + rect.toString());
+            }
 		}
+        if (needSendPixelFormat) {
+            synchronized (this) {
+                if (needSendPixelFormat) {
+                    needSendPixelFormat = false;
+                    protocol.setPixelFormat(pixelFormat);
+                    protocol.sendMessage(new SetPixelFormatMessage(pixelFormat));
+                    logger.fine("sent: " + pixelFormat);
+                    protocol.sendRefreshMessage();
+                    logger.fine("sent: nonincremental fb update");
+                }
+            }
+        } else {
+            protocol.sendMessage(fullscreenFbUpdateIncrementalRequest);
+        }
 	}
 
 	public synchronized void queueUpdatePixelFormat(PixelFormat pf) {
 		pixelFormat = pf;
 		needSendPixelFormat = true;
-//		context.sendMessage(new FramebufferUpdateRequestMessage(0, 0, 1, 1, false));
-	}
-
-	public void stopTask() {
-		isRunning = false;
+//		protocol.sendMessage(new FramebufferUpdateRequestMessage(0, 0, 1, 1, false));
 	}
 
 }

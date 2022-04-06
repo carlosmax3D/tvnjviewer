@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,21 +19,13 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.client;
 
 import com.glavsoft.exceptions.TransportException;
-import com.glavsoft.transport.Writer;
+import com.glavsoft.transport.Transport;
 
 public interface ClientToServerMessage {
-	byte SET_PIXEL_FORMAT = 0;
-	byte SET_ENCODINGS = 2;
-	byte FRAMEBUFFER_UPDATE_REQUEST = 3;
-	byte KEY_EVENT = 4;
-	byte POINTER_EVENT = 5;
-	byte CLIENT_CUT_TEXT = 6;
-
-	void send(Writer writer) throws TransportException;
+	void send(Transport transport) throws TransportException;
 }

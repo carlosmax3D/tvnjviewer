@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,37 +19,40 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.protocol.auth;
 
-import com.glavsoft.exceptions.FatalException;
-import com.glavsoft.exceptions.TransportException;
-import com.glavsoft.exceptions.UnsupportedSecurityTypeException;
-import com.glavsoft.rfb.CapabilityContainer;
-import com.glavsoft.rfb.IPasswordRetriever;
-import com.glavsoft.transport.Reader;
-import com.glavsoft.transport.Writer;
+import com.glavsoft.exceptions.*;
+import com.glavsoft.rfb.encoding.ServerInitMessage;
+import com.glavsoft.rfb.protocol.Protocol;
+import com.glavsoft.transport.Transport;
+
+import java.util.logging.Logger;
 
 public abstract class AuthHandler {
-	/**
-	 * Authenticate using apropriate auth scheme
-	 * @param reader
-	 * @param writer
-	 * @param passwordRetriever interface that realise callback function for password retrieving,
-	 * ex. by asking user with dialog frame etc.
-	 * @param authCaps authentication capabilities
-	 *
-	 * @return true if there was Tight protocol extention used, false - in the other way
-	 * @throws TransportException
-	 * @throws FatalException
-	 * @throws UnsupportedSecurityTypeException
+    private static final int AUTH_RESULT_OK = 0;
+//	private static final int AUTH_RESULT_FAILED = 1;
+    private Logger logger;
+
+    /**
+     * Not thread safe, no need to be thread safe
+     */
+    protected Logger logger() {
+        if (null == logger) {
+            logger = Logger.getLogger(getClass().getName());
+        }
+        return logger;
+    }
+    /**
+	 * Authenticate using appropriate auth scheme
+     *
+     * @param transport transport for i/o
+     * @param protocol rfb protocol object
+     * @return transport for future i/o using
 	 */
-	public abstract boolean authenticate(Reader reader, Writer writer,
-			CapabilityContainer authCaps, IPasswordRetriever passwordRetriever)
+	public abstract Transport authenticate(Transport transport, Protocol protocol)
 		throws TransportException, FatalException, UnsupportedSecurityTypeException;
-	protected boolean useSecurityResult = true;
 	public abstract SecurityType getType();
 	public int getId() {
 		return getType().getId();
@@ -57,10 +60,54 @@ public abstract class AuthHandler {
 	public String getName() {
 		return getType().name();
 	}
-	public boolean useSecurityResult() {
-		return useSecurityResult;
+
+    /**
+     * Check Security Result received from server
+     * May be:
+     * * 0 - OK
+     * * 1 - Failed
+     *
+     * Do not check on NoneAuthentication
+     */
+    public void checkSecurityResult(Transport transport) throws TransportException,
+            AuthenticationFailedException {
+        final int securityResult = transport.readInt32();
+        logger().fine("Security result: " + securityResult + (AUTH_RESULT_OK == securityResult ? " (OK)" : " (Failed)"));
+        if (securityResult != AUTH_RESULT_OK) {
+            try {
+                String reason = transport.readString();
+                logger().fine("Security result reason: " + reason);
+                throw new AuthenticationFailedException(reason);
+            } catch (ClosedConnectionException e) {
+                // protocol version 3.3 and 3.7 does not send reason string,
+                // but silently closes the connection
+                throw new AuthenticationFailedException("Authentication failed");
+            }
+        }
+    }
+
+    public void initProcedure(Transport transport, Protocol protocol) throws TransportException {
+        sendClientInitMessage(transport, protocol.getSettings().getSharedFlag());
+        ServerInitMessage serverInitMessage = readServerInitMessage(transport);
+		completeContextData(serverInitMessage, protocol);
+        protocol.registerRfbEncodings();
+    }
+
+    protected ServerInitMessage readServerInitMessage(Transport transport) throws TransportException {
+        final ServerInitMessage serverInitMessage = new ServerInitMessage().readFrom(transport);
+        logger().fine("Read: " + serverInitMessage);
+        return serverInitMessage;
 	}
-	public void setUseSecurityResult(boolean enabled) {
-		useSecurityResult = enabled;
+
+    protected void sendClientInitMessage(Transport transport, byte sharedFlag) throws TransportException {
+        logger().fine("Sent client-init-message: " + sharedFlag);
+        transport.writeByte(sharedFlag).flush();
+    }
+
+    protected void completeContextData(ServerInitMessage serverInitMessage, Protocol protocol) {
+		protocol.setServerPixelFormat(serverInitMessage.getPixelFormat());
+		protocol.setFbWidth(serverInitMessage.getFramebufferWidth());
+		protocol.setFbHeight(serverInitMessage.getFramebufferHeight());
+		protocol.setRemoteDesktopName(serverInitMessage.getName());
 	}
 }

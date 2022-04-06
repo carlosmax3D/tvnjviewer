@@ -1,7 +1,7 @@
-// Copyright (C) 2010, 2011, 2012, 2013 GlavSoft LLC.
+// Copyright (C) 2010 - 2014 GlavSoft LLC.
 // All rights reserved.
 //
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // This file is part of the TightVNC software.  Please visit our Web site:
 //
 //                       http://www.tightvnc.com/
@@ -19,13 +19,17 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-//-------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //
-
 package com.glavsoft.rfb.client;
 
 import com.glavsoft.exceptions.TransportException;
-import com.glavsoft.transport.Writer;
+import com.glavsoft.transport.Transport;
+
+import java.nio.charset.Charset;
+import java.util.Arrays;
+
+import static com.glavsoft.utils.Strings.*;
 
 /**
  * ClientCutText
@@ -41,17 +45,18 @@ import com.glavsoft.transport.Writer;
 public class ClientCutTextMessage implements ClientToServerMessage {
 	private final byte [] bytes;
 
-	public ClientCutTextMessage(byte[] bytes) {
-		this.bytes = bytes;
+	public ClientCutTextMessage(String str, Charset charset) {
+        final byte[] b = charset != null? getBytesWithCharset(str, charset): str.getBytes();
+        this.bytes = Arrays.copyOf(b, b.length);
 	}
 
 	@Override
-	public void send(Writer writer) throws TransportException {
-		writer.write(CLIENT_CUT_TEXT);
-		writer.writeByte(0); writer.writeInt16(0); // padding
-		writer.write(bytes.length);
-		writer.write(bytes); // TODO: [dime] convert 'text' String to byte arrya using right charset
-		writer.flush();
+	public void send(Transport transport) throws TransportException {
+		transport.writeByte(ClientMessageType.CLIENT_CUT_TEXT.id)
+                .zero(3) // padding
+		        .writeInt32(bytes.length)
+                .write(bytes)
+		        .flush();
 	}
 
 	@Override
